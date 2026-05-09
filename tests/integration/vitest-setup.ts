@@ -7,7 +7,7 @@ import { afterAll } from 'vitest'
 // module-local, so it must be applied here to take effect for the worker/queue
 // code under test.
 setRetryScheduleOverride([0, 50, 100, 200, 400, 800, 1600])
-setBreakerConfigOverride({ initialOpenMs: 100, maxOpenMs: 1_000 })
+setBreakerConfigOverride({ initialOpenMs: 1_000, maxOpenMs: 5_000 })
 
 afterAll(() => {
   setRetryScheduleOverride(null)
