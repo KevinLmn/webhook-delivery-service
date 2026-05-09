@@ -1,0 +1,29 @@
+{
+  "name": "vitrine",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "test": "pnpm test:unit && pnpm test:integration",
+    "test:unit": "pnpm -r --filter './packages/**' test",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "dev": "concurrently -n api,worker -c blue,magenta 'pnpm --filter @vitrine/api dev' 'pnpm --filter @vitrine/worker dev'",
+    "db:generate": "pnpm --filter @vitrine/db generate",
+    "db:push": "pnpm --filter @vitrine/db push",
+    "cli:create-client": "tsx scripts/cli/create-client.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "concurrently": "^9.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
