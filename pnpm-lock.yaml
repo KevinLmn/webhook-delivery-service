@@ -38,6 +38,9 @@ importers:
       bullmq:
         specifier: ^5.0.0
         version: 5.76.6
+      drizzle-orm:
+        specifier: ^0.36.0
+        version: 0.36.4(postgres@3.4.9)
       fastify:
         specifier: ^5.0.0
         version: 5.8.5
