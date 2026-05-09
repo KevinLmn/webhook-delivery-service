@@ -1,6 +1,7 @@
 import type { DbClient } from '@vitrine/db'
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify'
 import type { Redis } from 'ioredis'
+import { authPlugin } from './plugins/auth'
 import { type AppConfig, configPlugin, loadConfigFromEnv } from './plugins/config'
 import { dbPlugin } from './plugins/db'
 import { queuePlugin } from './plugins/queue'
@@ -21,6 +22,7 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   await app.register(configPlugin, { config })
   await app.register(dbPlugin, opts.db ? { db: opts.db } : {})
   await app.register(queuePlugin, opts.redis ? { redis: opts.redis } : {})
+  await app.register(authPlugin)
 
   app.get('/health', async () => ({ ok: true }))
   app.get('/ready', async () => {
