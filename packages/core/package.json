@@ -1,0 +1,26 @@
+{
+  "name": "@vitrine/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./crypto": "./src/crypto/index.ts",
+    "./breaker": "./src/breaker/index.ts",
+    "./retry": "./src/retry/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@node-rs/argon2": "^2.0.0",
+    "ulid": "^2.3.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.0"
+  }
+}
