@@ -1,0 +1,22 @@
+{
+  "name": "@vitrine/test-helpers",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "typecheck": "tsc --noEmit" },
+  "dependencies": {
+    "@vitrine/core": "workspace:*",
+    "@vitrine/db": "workspace:*",
+    "@vitrine/queue": "workspace:*",
+    "@testcontainers/postgresql": "^10.13.0",
+    "@testcontainers/redis": "^10.13.0",
+    "fastify": "^5.0.0",
+    "testcontainers": "^10.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0"
+  }
+}

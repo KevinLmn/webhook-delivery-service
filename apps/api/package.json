@@ -1,0 +1,25 @@
+{
+  "name": "@vitrine/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p .",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@vitrine/core": "workspace:*",
+    "@vitrine/db": "workspace:*",
+    "@vitrine/queue": "workspace:*",
+    "fastify": "^5.0.0",
+    "fastify-plugin": "^5.0.0",
+    "pino": "^9.0.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0"
+  }
+}
