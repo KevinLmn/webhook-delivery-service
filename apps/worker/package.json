@@ -14,6 +14,7 @@
     "@vitrine/db": "workspace:*",
     "@vitrine/queue": "workspace:*",
     "bullmq": "^5.0.0",
+    "drizzle-orm": "^0.36.0",
     "ioredis": "^5.4.0",
     "pino": "^9.0.0",
     "undici": "^6.0.0"
