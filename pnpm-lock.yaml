@@ -11,6 +11,15 @@ importers:
       '@biomejs/biome':
         specifier: ^1.9.4
         version: 1.9.4
+      '@vitrine/core':
+        specifier: workspace:*
+        version: link:packages/core
+      '@vitrine/db':
+        specifier: workspace:*
+        version: link:packages/db
+      '@vitrine/test-helpers':
+        specifier: workspace:*
+        version: link:packages/test-helpers
       concurrently:
         specifier: ^9.0.0
         version: 9.2.1

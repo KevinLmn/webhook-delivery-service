@@ -23,12 +23,15 @@ export async function startApp(opts: {
   redisUrl: string
 }): Promise<AppFixture> {
   const masterKey = randomBytes(32)
-  const env = {
-    DATABASE_URL: opts.databaseUrl,
-    REDIS_URL: opts.redisUrl,
-    MASTER_ENCRYPTION_KEY: masterKey.toString('base64'),
-    LOG_LEVEL: 'silent'
-  }
+  // `buildApp` calls `loadConfigFromEnv()` when no `config` is passed, so we
+  // need DATABASE_URL / REDIS_URL / MASTER_ENCRYPTION_KEY to be present in
+  // process.env for the Zod parse to succeed. The fields we want to override
+  // (db, redis, masterKey) are still passed explicitly via `opts`.
+  process.env.DATABASE_URL = opts.databaseUrl
+  process.env.REDIS_URL = opts.redisUrl
+  process.env.MASTER_ENCRYPTION_KEY = masterKey.toString('base64')
+  process.env.LOG_LEVEL = process.env.LOG_LEVEL ?? 'silent'
+
   const db = createDbClient(opts.databaseUrl)
   const redis = createRedisClient(opts.redisUrl)
   const app = await buildApp({ db, redis, masterKey, logger: { level: 'silent' } })
@@ -46,9 +49,13 @@ export async function startApp(opts: {
     masterKey,
     baseUrl,
     close: async () => {
+      // Order matters: close the worker first so it stops pulling jobs while
+      // the queue/connection is still alive. Then close Fastify, which triggers
+      // the queue plugin's onClose hook that closes the queue and quits the
+      // shared IORedis connection. Calling `redis.quit()` here would race with
+      // that hook and surface as "Connection is closed".
       await worker.close()
       await app.close()
-      await redis.quit()
     }
   }
 }
