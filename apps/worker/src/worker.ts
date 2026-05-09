@@ -6,11 +6,13 @@ import {
   workerSettings,
   type DeliveryJobData
 } from '@vitrine/queue'
-import { createDbClient, type DbClient } from '@vitrine/db'
+import { createDbClient, events, type DbClient } from '@vitrine/db'
+import { and, eq } from 'drizzle-orm'
 import pino from 'pino'
 import type { Logger, LoggerOptions } from 'pino'
 import type { Redis } from 'ioredis'
 import { deliver } from './deliver'
+import { getMaxAttempts } from '@vitrine/core'
 
 export interface StartWorkerOptions {
   db?: DbClient
@@ -79,6 +81,21 @@ export async function startWorker(opts: StartWorkerOptions): Promise<Worker<Deli
 
   worker.on('failed', (job, err) => {
     logger.warn({ jobId: job?.id, err: err.message }, 'job failed')
+    if (!job) return
+    // When BullMQ has exhausted all configured attempts, mark the event dead so
+    // the API surfaces it as terminal. UnrecoverableError already updated the
+    // event row inside deliver(); here we cover the path where retries simply
+    // ran out (5xx / network errors that never produced a 4xx).
+    const maxAttempts = getMaxAttempts()
+    if (job.attemptsMade >= maxAttempts) {
+      void db
+        .update(events)
+        .set({ status: 'dead', deadAt: new Date() })
+        .where(and(eq(events.id, job.data.eventId), eq(events.status, 'pending')))
+        .catch((dbErr) => {
+          logger.error({ jobId: job.id, err: (dbErr as Error).message }, 'failed to mark event dead')
+        })
+    }
   })
 
   return worker

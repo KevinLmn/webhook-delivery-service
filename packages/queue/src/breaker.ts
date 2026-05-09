@@ -9,10 +9,26 @@ const __dirname = path.dirname(__filename)
 
 const SCRIPT = readFileSync(path.join(__dirname, 'lua', 'record_outcome.lua'), 'utf8')
 
-const INITIAL_OPEN_MS = 30_000
-const MAX_OPEN_MS = 30 * 60_000
-const FAIL_THRESHOLD = 5
+const DEFAULT_INITIAL_OPEN_MS = 30_000
+const DEFAULT_MAX_OPEN_MS = 30 * 60_000
+const DEFAULT_FAIL_THRESHOLD = 5
 const TTL_SEC = 24 * 3600
+
+export interface BreakerConfigOverride {
+  initialOpenMs?: number
+  maxOpenMs?: number
+  failThreshold?: number
+}
+
+let configOverride: BreakerConfigOverride | null = null
+
+/**
+ * Test-only hook: shorten breaker durations / threshold for fast integration
+ * tests. Production code never calls this (defaults match the spec).
+ */
+export function setBreakerConfigOverride(override: BreakerConfigOverride | null): void {
+  configOverride = override
+}
 
 export type BreakerEvent = 'success' | 'failure' | 'read'
 
@@ -34,9 +50,9 @@ export async function recordOutcome(
   const args = [
     event,
     String(nowMs),
-    String(INITIAL_OPEN_MS),
-    String(MAX_OPEN_MS),
-    String(FAIL_THRESHOLD),
+    String(configOverride?.initialOpenMs ?? DEFAULT_INITIAL_OPEN_MS),
+    String(configOverride?.maxOpenMs ?? DEFAULT_MAX_OPEN_MS),
+    String(configOverride?.failThreshold ?? DEFAULT_FAIL_THRESHOLD),
     String(TTL_SEC)
   ]
   let raw: string

@@ -17,6 +17,9 @@ importers:
       '@vitrine/db':
         specifier: workspace:*
         version: link:packages/db
+      '@vitrine/queue':
+        specifier: workspace:*
+        version: link:packages/queue
       '@vitrine/test-helpers':
         specifier: workspace:*
         version: link:packages/test-helpers
