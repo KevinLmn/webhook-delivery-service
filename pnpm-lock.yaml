@@ -182,6 +182,12 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.18
+      bullmq:
+        specifier: ^5.0.0
+        version: 5.76.6
+      ioredis:
+        specifier: ^5.4.0
+        version: 5.10.1
 
 packages:
 

@@ -1,6 +1,3 @@
-// @ts-nocheck
-// TODO: remove after G.3 implements startWorker matching signature
-// (F.1 already provides matching buildApp signature)
 import { buildApp } from '../../../apps/api/src/server'
 import { startWorker } from '../../../apps/worker/src/worker'
 import { createDbClient } from '@vitrine/db'

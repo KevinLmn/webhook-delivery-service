@@ -17,6 +17,8 @@
     "testcontainers": "^10.13.0"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0"
+    "@types/node": "^22.0.0",
+    "bullmq": "^5.0.0",
+    "ioredis": "^5.4.0"
   }
 }
