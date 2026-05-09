@@ -28,7 +28,9 @@ describe('encryption (AES-256-GCM)', () => {
 
   it('decrypt avec un ciphertext altéré échoue (auth tag invalide)', () => {
     const ciphertext = encryptSecret('secret', masterKey)
-    ciphertext[ciphertext.length - 1] ^= 1
+    const lastIdx = ciphertext.length - 1
+    const lastByte = ciphertext.readUInt8(lastIdx)
+    ciphertext.writeUInt8(lastByte ^ 1, lastIdx)
     expect(() => decryptSecret(ciphertext, masterKey)).toThrow()
   })
 
