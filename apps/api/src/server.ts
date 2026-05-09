@@ -1,7 +1,9 @@
-import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify'
 import type { DbClient } from '@vitrine/db'
+import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify'
 import type { Redis } from 'ioredis'
 import { type AppConfig, configPlugin, loadConfigFromEnv } from './plugins/config'
+import { dbPlugin } from './plugins/db'
+import { queuePlugin } from './plugins/queue'
 
 export interface BuildAppOptions {
   config?: AppConfig
@@ -17,9 +19,19 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
 
   const app = Fastify({ logger: opts.logger ?? { level: config.logLevel } })
   await app.register(configPlugin, { config })
+  await app.register(dbPlugin, opts.db ? { db: opts.db } : {})
+  await app.register(queuePlugin, opts.redis ? { redis: opts.redis } : {})
 
   app.get('/health', async () => ({ ok: true }))
-  app.get('/ready', async () => ({ ok: true })) // expanded in task F.6
+  app.get('/ready', async () => {
+    try {
+      await app.redis.ping()
+      // db readiness check via simple SELECT — added when db package exposes a ping helper
+      return { ok: true }
+    } catch {
+      throw new Error('not ready')
+    }
+  })
 
   return app
 }

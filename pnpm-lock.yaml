@@ -35,6 +35,9 @@ importers:
       '@vitrine/queue':
         specifier: workspace:*
         version: link:../../packages/queue
+      bullmq:
+        specifier: ^5.0.0
+        version: 5.76.6
       fastify:
         specifier: ^5.0.0
         version: 5.8.5
