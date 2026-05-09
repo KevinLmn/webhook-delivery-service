@@ -7,6 +7,7 @@ import { dbPlugin } from './plugins/db'
 import { queuePlugin } from './plugins/queue'
 import { endpointsRoutes } from './routes/endpoints'
 import { eventsRoutes } from './routes/events'
+import { replayRoutes } from './routes/replay'
 
 export interface BuildAppOptions {
   config?: AppConfig
@@ -27,6 +28,7 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   await app.register(authPlugin)
   await app.register(endpointsRoutes)
   await app.register(eventsRoutes)
+  await app.register(replayRoutes)
 
   app.get('/health', async () => ({ ok: true }))
   app.get('/ready', async () => {
