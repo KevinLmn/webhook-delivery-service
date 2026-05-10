@@ -17,7 +17,8 @@
     "dev": "concurrently -n api,worker -c blue,magenta 'pnpm --filter @vitrine/api dev' 'pnpm --filter @vitrine/worker dev'",
     "db:generate": "pnpm --filter @vitrine/db generate",
     "db:push": "pnpm --filter @vitrine/db push",
-    "cli:create-client": "tsx scripts/cli/create-client.ts"
+    "cli:create-client": "tsx scripts/cli/create-client.ts",
+    "demo:chaos": "tsx scripts/chaos/run.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
@@ -25,9 +26,14 @@
     "@vitrine/db": "workspace:*",
     "@vitrine/queue": "workspace:*",
     "@vitrine/test-helpers": "workspace:*",
+    "chart.js": "^4.4.0",
+    "chartjs-node-canvas": "^4.1.6",
     "concurrently": "^9.0.0",
+    "fastify": "^5.0.0",
+    "ioredis": "^5.4.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
+    "undici": "^6.20.0",
     "vitest": "^2.1.0"
   }
 }
