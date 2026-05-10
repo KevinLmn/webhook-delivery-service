@@ -1,8 +1,12 @@
 # Webhook Delivery Service
 
+[![CI](https://github.com/<USER>/<REPO>/actions/workflows/ci.yml/badge.svg)](https://github.com/<USER>/<REPO>/actions/workflows/ci.yml)
+
 Service Node/TypeScript qui ingère des événements via une API HTTP et les livre à des endpoints clients tiers, avec retry exponentiel, circuit breaker, idempotency keys et replay manuel. Modèle d'API aligné sur [Standard Webhooks](https://www.standardwebhooks.com).
 
 > Projet vitrine. Pas un service de production utilisé par de vrais clients.
+
+**Live demo** : https://vitrine-webhook-demo.fly.dev/ready (Fly.io single region `cdg` + Neon Postgres + Upstash Redis).
 
 ## Fonctionnalités V1
 
@@ -82,9 +86,40 @@ pnpm test:unit           # tests unitaires (packages), < 5s
 pnpm test:integration    # 16 tests d'intégration (Testcontainers Postgres + Redis), ~3 min
 ```
 
+## Chaos demo
+
+Le script `pnpm demo:chaos` orchestre une démo end-to-end qui :
+
+1. spawn un fake endpoint local scénarisé en 4 phases (200 OK → 500 → 50/50 → 200 OK) ;
+2. boote un stack Postgres + Redis + API + Worker via `docker-compose.demo.yml` ;
+3. push 100 events sur 5 s, sample l'état du système à 1 Hz pendant ~140 s ;
+4. génère un PNG annoté dans `docs/chaos-runs/`.
+
+```bash
+pnpm demo:chaos
+```
+
+Le run prend ~3 min. Le PNG illustre la mécanique du circuit breaker : ouverture pendant la phase de panne, transition `half_open` après le cooldown, retour à `closed` à la reprise.
+
+### Dernier run
+
+![Latest chaos run](docs/chaos-runs/<FILE_STEM>.png)
+
 ## Architecture
 
 Voir [`docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md`](docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md).
+
+## Déploiement
+
+Image Docker multi-stage (`docker/Dockerfile`) commune à l'API et au Worker. Topologie Fly : un seul app avec deux process groups (`api` exposé HTTP, `worker` background).
+
+```bash
+flyctl deploy --app vitrine-webhook-demo
+```
+
+Migrations Drizzle exécutées automatiquement avant chaque release via `release_command` dans `fly.toml`. Secrets gérés par `flyctl secrets set` (`DATABASE_URL`, `REDIS_URL`, `MASTER_ENCRYPTION_KEY`).
+
+CD configurée : push to `main` déclenche `.github/workflows/deploy.yml` qui appelle `flyctl deploy --remote-only`.
 
 ## Plan d'implémentation
 
@@ -99,9 +134,17 @@ apps/
 packages/
   core/                       # crypto, ids, retry schedule, signature, breaker logic
   db/                         # Drizzle schema + client
-  queue/                      # BullMQ wrapper, Redis Lua scripts (idempotency, breaker)
+  queue/                      # BullMQ wrapper, Redis Lua scripts
   test-helpers/               # containers, app fixture, seed helpers
-scripts/cli/                  # CLI utilitaires (create-client)
+scripts/
+  cli/                        # CLI utilitaires (create-client)
+  chaos/                      # demo:chaos (orchestrator + fake endpoint + PNG)
+docker/Dockerfile             # image multi-stage API + Worker
+docker-compose.yml            # dev local (Postgres + Redis)
+docker-compose.demo.yml       # chaos demo stack (build l'image)
+fly.toml                      # déploiement Fly (api + worker process groups)
+.github/workflows/            # ci.yml + deploy.yml
 tests/integration/            # 16 tests Testcontainers
 docs/superpowers/             # specs et plans
+docs/chaos-runs/              # PNG du dernier run chaos
 ```
