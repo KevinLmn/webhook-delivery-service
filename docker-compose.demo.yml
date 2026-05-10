@@ -1,0 +1,81 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: vitrine_demo
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d vitrine_demo"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "5433:5432"  # éviter collision avec docker-compose.yml dev qui occupe 5432
+
+  redis:
+    image: redis:7-alpine
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "6380:6379"  # idem, éviter collision avec dev
+
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/vitrine_demo
+    command: ["pnpm", "--filter", "@vitrine/db", "push", "--force"]
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/vitrine_demo
+      REDIS_URL: redis://redis:6379
+      MASTER_ENCRYPTION_KEY: ${MASTER_ENCRYPTION_KEY}
+      LOG_LEVEL: info
+      PORT: "3000"
+      NODE_ENV: production
+    command: ["pnpm", "--filter", "@vitrine/api", "start"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # rendre le fake endpoint joignable sous Linux
+    ports:
+      - "3001:3000"  # 3001 côté host pour éviter collision avec dev
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/vitrine_demo
+      REDIS_URL: redis://redis:6379
+      MASTER_ENCRYPTION_KEY: ${MASTER_ENCRYPTION_KEY}
+      LOG_LEVEL: info
+      NODE_ENV: production
+    command: ["pnpm", "--filter", "@vitrine/worker", "start"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
