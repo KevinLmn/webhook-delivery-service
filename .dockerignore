@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+**/dist
+.git
+.github
+docs/chaos-runs/*.png
+docs
+tests
+.env
+.env.*
+coverage
+*.log
+.DS_Store
