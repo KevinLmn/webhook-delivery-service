@@ -1,0 +1,89 @@
+import Fastify, { type FastifyInstance } from 'fastify'
+
+export interface PhaseConfig {
+  /** ms depuis startTime auquel cette phase prend effet */
+  startMs: number
+  /** Comportement de l'endpoint pendant cette phase */
+  behavior:
+    | { kind: 'ok' }
+    | { kind: 'fail'; statusCode: number }
+    | { kind: 'mixed'; failRatio: number; failStatusCode: number }
+}
+
+export interface FakeEndpoint {
+  url: string
+  startedAt: number
+  /** Nombre cumulé de requêtes reçues */
+  totalReceived: () => number
+  /** Phase active à un instant donné (pour annoter le PNG) */
+  phaseAt: (ms: number) => number
+  close: () => Promise<void>
+}
+
+export const CHAOS_PHASES: PhaseConfig[] = [
+  { startMs: 0, behavior: { kind: 'ok' } },
+  { startMs: 10_000, behavior: { kind: 'fail', statusCode: 500 } },
+  { startMs: 40_000, behavior: { kind: 'mixed', failRatio: 0.5, failStatusCode: 500 } },
+  { startMs: 80_000, behavior: { kind: 'ok' } }
+]
+
+function activeBehavior(elapsedMs: number, phases: PhaseConfig[]): PhaseConfig['behavior'] {
+  let active = phases[0]!.behavior
+  for (const phase of phases) {
+    if (elapsedMs >= phase.startMs) active = phase.behavior
+  }
+  return active
+}
+
+export async function startChaosFakeEndpoint(opts: {
+  phases?: PhaseConfig[]
+  port?: number
+}): Promise<FakeEndpoint> {
+  const phases = opts.phases ?? CHAOS_PHASES
+  const startedAt = Date.now()
+  let totalReceived = 0
+
+  const app: FastifyInstance = Fastify({ logger: false })
+
+  app.post('/hook', async (req, reply) => {
+    totalReceived++
+    const elapsedMs = Date.now() - startedAt
+    const behavior = activeBehavior(elapsedMs, phases)
+
+    if (behavior.kind === 'fail') {
+      return reply.code(behavior.statusCode).send({ error: 'fail' })
+    }
+    if (behavior.kind === 'mixed') {
+      const fail = Math.random() < behavior.failRatio
+      if (fail) return reply.code(behavior.failStatusCode).send({ error: 'fail' })
+      return reply.code(200).send({ ok: true })
+    }
+    return reply.code(200).send({ ok: true })
+  })
+
+  // 0.0.0.0 pour être joignable depuis le conteneur worker via host.docker.internal
+  await app.listen({ host: '0.0.0.0', port: opts.port ?? 0 })
+  const address = app.server.address()
+  if (!address || typeof address === 'string') throw new Error('listen failed')
+
+  // L'URL communiquée à l'API doit pointer vers le host depuis l'intérieur du worker
+  // Docker. Sur Docker Desktop (mac/win), `host.docker.internal` résout le host.
+  // Sur Linux, on passe par `--add-host=host.docker.internal:host-gateway` dans le compose.
+  const url = `http://host.docker.internal:${address.port}/hook`
+
+  return {
+    url,
+    startedAt,
+    totalReceived: () => totalReceived,
+    phaseAt: (ms) => {
+      let idx = 0
+      for (let i = 0; i < phases.length; i++) {
+        if (ms >= phases[i]!.startMs) idx = i
+      }
+      return idx + 1
+    },
+    close: async () => {
+      await app.close()
+    }
+  }
+}
