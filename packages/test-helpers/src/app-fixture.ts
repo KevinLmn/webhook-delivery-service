@@ -2,6 +2,7 @@ import { buildApp } from '../../../apps/api/src/server'
 import { startWorker } from '../../../apps/worker/src/worker'
 import { createDbClient } from '@vitrine/db'
 import { createRedisClient } from '@vitrine/queue'
+import pino from 'pino'
 import type { FastifyInstance } from 'fastify'
 import type { Worker } from 'bullmq'
 import type { Redis } from 'ioredis'
@@ -39,7 +40,7 @@ export async function startApp(opts: {
   const addr = app.server.address()
   if (!addr || typeof addr === 'string') throw new Error('listen failed')
   const baseUrl = `http://127.0.0.1:${addr.port}`
-  const worker = await startWorker({ db, redis, masterKey, logger: { level: 'silent' } })
+  const worker = await startWorker({ db, redis, masterKey, logger: pino({ level: 'silent' }) })
 
   return {
     app,
