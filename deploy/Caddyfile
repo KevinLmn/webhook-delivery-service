@@ -1,0 +1,20 @@
+# Only the demo service is public. The API, worker, Postgres and Redis stay on
+# the internal docker network.
+{$DOMAIN} {
+	encode zstd gzip
+
+	reverse_proxy demo:3100 {
+		# Server-Sent Events: push every tick to the browser immediately
+		flush_interval -1
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

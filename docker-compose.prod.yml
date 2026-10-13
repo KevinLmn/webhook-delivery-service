@@ -1,0 +1,106 @@
+# Production stack for a single VPS: `docker compose -f docker-compose.prod.yml up -d --build`
+# Required in .env (next to this file): DOMAIN, POSTGRES_PASSWORD, MASTER_ENCRYPTION_KEY.
+x-app: &app
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+  image: vitrine-app:latest
+  restart: unless-stopped
+  environment: &app-env
+    DATABASE_URL: postgres://vitrine:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/vitrine
+    REDIS_URL: redis://redis:6379
+    MASTER_ENCRYPTION_KEY: ${MASTER_ENCRYPTION_KEY:?set MASTER_ENCRYPTION_KEY}
+    LOG_LEVEL: info
+    NODE_ENV: production
+  logging: &logging
+    driver: json-file
+    options: { max-size: 10m, max-file: "3" }
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vitrine
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: vitrine
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vitrine -d vitrine"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    logging: *logging
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "128mb", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    logging: *logging
+
+  migrate:
+    <<: *app
+    restart: "no"
+    depends_on:
+      postgres: { condition: service_healthy }
+    command: ["pnpm", "--filter", "@vitrine/db", "push", "--force"]
+
+  api:
+    <<: *app
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    environment:
+      <<: *app-env
+      PORT: "3000"
+    command: ["pnpm", "--filter", "@vitrine/api", "start"]
+
+  worker:
+    <<: *app
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    command: ["pnpm", "--filter", "@vitrine/worker", "start"]
+
+  demo:
+    <<: *app
+    depends_on:
+      api: { condition: service_started }
+      migrate: { condition: service_completed_successfully }
+    environment:
+      <<: *app-env
+      PORT: "3100"
+      HOOK_PORT: "3200"
+      DEMO_API_URL: http://api:3000
+      DEMO_HOOK_URL: http://demo:3200
+    command: ["pnpm", "--filter", "@vitrine/demo", "start"]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [demo]
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    logging: *logging
+
+volumes:
+  pgdata:
+  redisdata:
+  caddy_data:
+  caddy_config:

@@ -94,6 +94,40 @@ importers:
         specifier: ^22.0.0
         version: 22.19.18
 
+  apps/demo:
+    dependencies:
+      '@vitrine/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@vitrine/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      drizzle-orm:
+        specifier: ^0.36.0
+        version: 0.36.4(postgres@3.4.9)
+      fastify:
+        specifier: ^5.0.0
+        version: 5.8.5
+      ioredis:
+        specifier: ^5.4.0
+        version: 5.10.1
+      pino:
+        specifier: ^9.0.0
+        version: 9.14.0
+      tsx:
+        specifier: ^4.19.0
+        version: 4.21.0
+      undici:
+        specifier: ^6.0.0
+        version: 6.25.0
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.18
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.18)
+
   apps/worker:
     dependencies:
       '@vitrine/core':

@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Webhook Chaos Demo</title>
+  <meta name="description" content="Live demo of a webhook delivery service: 100 events, an endpoint that crashes, flaps and recovers, retries and a circuit breaker playing out in real time.">
+  <meta name="color-scheme" content="dark light">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" type="module"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="brand" href="/">
+        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h5l2-5 3 10 2-5h4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>webhook-delivery-service</span>
+      </a>
+      <nav class="topnav">
+        <a href="#how">How it works</a>
+        <a id="repo-link" href="https://github.com/KevinLmn/webhook-delivery-service" rel="noopener">GitHub <span aria-hidden="true">↗</span></a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <p class="eyebrow"><span class="live-dot" aria-hidden="true"></span> Live chaos demo</p>
+      <h1>Watch a webhook pipeline survive an outage.</h1>
+      <p class="lede">
+        Press the button and 100 events go through the real API, queue and worker toward an endpoint
+        that is about to crash, flap, then recover. Retries, the circuit breaker and dead letters play
+        out live. Nothing is simulated in your browser: every number below is read from Postgres and Redis.
+      </p>
+    </section>
+
+    <section class="card control" aria-labelledby="control-title">
+      <h2 id="control-title" class="visually-hidden">Scenario control</h2>
+      <div class="control-row">
+        <button id="run-btn" class="btn" type="button">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" fill="currentColor"/></svg>
+          <span id="run-btn-label">Run outage scenario</span>
+        </button>
+        <p id="status" class="status" role="status" aria-live="polite">Connecting…</p>
+        <p class="clock"><span id="clock">0:00</span><span class="clock-total"> / <span id="clock-total">2:20</span></span></p>
+      </div>
+
+      <div class="timeline" id="timeline" aria-hidden="true">
+        <div class="timeline-track" id="timeline-track"></div>
+        <div class="timeline-push" id="timeline-push"><span>events pushed</span></div>
+        <div class="playhead" id="playhead"></div>
+      </div>
+
+      <div class="phase-now">
+        <span class="phase-chip" id="phase-chip">Waiting</span>
+        <p id="phase-desc">One run takes 2 min 20 s. Anyone visiting the page watches the same run.</p>
+      </div>
+    </section>
+
+    <section class="kpis" aria-label="Live counters">
+      <article class="kpi kpi-delivered">
+        <h3>Delivered</h3>
+        <p class="kpi-value"><span id="kpi-delivered">0</span><small>/ <span id="kpi-total">100</span></small></p>
+        <div class="meter"><span id="meter-delivered"></span></div>
+      </article>
+      <article class="kpi kpi-pending">
+        <h3>Pending</h3>
+        <p class="kpi-value"><span id="kpi-pending">0</span></p>
+        <p class="kpi-sub">queued or waiting for a retry</p>
+      </article>
+      <article class="kpi kpi-dead">
+        <h3>Dead</h3>
+        <p class="kpi-value"><span id="kpi-dead">0</span></p>
+        <p class="kpi-sub">rejected with 4xx, not retried</p>
+      </article>
+      <article class="kpi">
+        <h3>HTTP attempts</h3>
+        <p class="kpi-value"><span id="kpi-attempts">0</span></p>
+        <p class="kpi-sub"><span id="kpi-skips">0</span> postponed by the breaker</p>
+      </article>
+      <article class="kpi kpi-breaker" id="kpi-breaker" data-state="closed">
+        <h3>Circuit breaker</h3>
+        <p class="kpi-value breaker-value"><span class="breaker-dot" aria-hidden="true"></span><span id="kpi-breaker-state">closed</span></p>
+        <p class="kpi-sub" id="kpi-breaker-sub">failure streak 0 / 5</p>
+      </article>
+    </section>
+
+    <section class="card chart-card" aria-labelledby="chart-title">
+      <header class="card-head">
+        <div>
+          <h2 id="chart-title">Event status over time</h2>
+          <p class="card-sub">Sampled every second. Background bands are the endpoint's behaviour.</p>
+        </div>
+        <ul class="legend">
+          <li><span class="swatch sw-delivered"></span>delivered</li>
+          <li><span class="swatch sw-pending"></span>pending</li>
+          <li><span class="swatch sw-dead"></span>dead</li>
+          <li><span class="swatch sw-breaker"></span>breaker open</li>
+        </ul>
+      </header>
+      <div class="chart-wrap">
+        <svg id="chart" class="chart" viewBox="0 0 1000 360" role="img" aria-label="Delivered, pending and dead events over time"></svg>
+        <div class="chart-tip" id="chart-tip" hidden></div>
+        <p class="chart-empty" id="chart-empty">No run yet. Press <strong>Run outage scenario</strong> to start one.</p>
+      </div>
+    </section>
+
+    <section class="split">
+      <section class="card log-card" aria-labelledby="log-title">
+        <header class="card-head">
+          <div>
+            <h2 id="log-title">Delivery attempts</h2>
+            <p class="card-sub">The worker's audit log, newest first.</p>
+          </div>
+        </header>
+        <div class="log-scroll">
+          <table class="log">
+            <thead>
+              <tr><th>t</th><th>event</th><th>try</th><th>http</th><th>ms</th><th>outcome</th></tr>
+            </thead>
+            <tbody id="log-body"></tbody>
+          </table>
+          <p class="log-empty" id="log-empty">Attempts will stream here.</p>
+        </div>
+      </section>
+
+      <section class="card receiver" aria-labelledby="receiver-title">
+        <header class="card-head">
+          <div>
+            <h2 id="receiver-title">Receiver side</h2>
+            <p class="card-sub">What the customer endpoint saw.</p>
+          </div>
+        </header>
+        <dl class="stats">
+          <div><dt>Webhooks received</dt><dd id="rx-received">0</dd></div>
+          <div><dt>Signature verified</dt><dd id="rx-verified">0</dd></div>
+          <div><dt>Bad signature</dt><dd id="rx-rejected">0</dd></div>
+          <div><dt>Events accepted by the API</dt><dd><span id="rx-accepted">0</span> / <span id="rx-pushed">0</span></dd></div>
+        </dl>
+        <div class="codes" aria-label="Responses by status class">
+          <div class="codes-bar" id="codes-bar"></div>
+          <ul class="codes-legend">
+            <li><span class="swatch sw-delivered"></span>2xx <b id="c-2xx">0</b></li>
+            <li><span class="swatch sw-fail"></span>5xx <b id="c-5xx">0</b></li>
+            <li><span class="swatch sw-dead"></span>4xx <b id="c-4xx">0</b></li>
+          </ul>
+        </div>
+        <p class="note">
+          Every request carries <code>webhook-id</code>, <code>webhook-timestamp</code> and an HMAC-SHA256
+          <code>webhook-signature</code>. The endpoint verifies it in constant time before answering,
+          exactly like a production consumer should.
+        </p>
+      </section>
+    </section>
+
+    <section id="how" class="how" aria-labelledby="how-title">
+      <h2 id="how-title">What you are looking at</h2>
+      <ol class="flow" aria-label="Request path">
+        <li>Browser</li><li>API <small>Fastify</small></li><li>Queue <small>BullMQ · Redis</small></li><li>Worker</li><li>Endpoint</li>
+      </ol>
+      <div class="how-grid">
+        <article class="how-card">
+          <h3><span class="num">1</span> Idempotent ingestion</h3>
+          <p><code>POST /events</code> requires an <code>Idempotency-Key</code>. The API stores the event in Postgres, enqueues it and answers <code>202</code> immediately: delivery is asynchronous.</p>
+          <a data-src="apps/api/src/services/ingestion.ts">ingestion.ts</a>
+        </article>
+        <article class="how-card">
+          <h3><span class="num">2</span> Signed delivery</h3>
+          <p>The worker signs <code>id.timestamp.body</code> with the endpoint's secret (stored AES-256-GCM encrypted) and logs every attempt, success or not.</p>
+          <a data-src="apps/worker/src/deliver.ts">deliver.ts</a>
+        </article>
+        <article class="how-card">
+          <h3><span class="num">3</span> Retries with backoff</h3>
+          <p>5xx, timeouts and network errors are retried: 1 s, 10 s, 1 min, 10 min, 1 h, 6 h, with ±20% jitter. <code>429 Retry-After</code> is honoured.</p>
+          <a data-src="packages/core/src/retry/backoff.ts">backoff.ts</a>
+        </article>
+        <article class="how-card">
+          <h3><span class="num">4</span> Circuit breaker</h3>
+          <p>5 failures in a row open the breaker for 30 s (doubling on relapse). Deliveries are postponed, not attempted. Then one probe goes through (<code>half_open</code>). State lives in Redis, updated by an atomic Lua script shared by all workers.</p>
+          <a data-src="packages/queue/src/lua/record_outcome.lua">record_outcome.lua</a>
+        </article>
+        <article class="how-card">
+          <h3><span class="num">5</span> Dead letters</h3>
+          <p>A 4xx means the endpoint is alive but refuses this payload: retrying won't help. The event goes straight to <code>dead</code>, and can be replayed manually later. 4 of the 100 events here are built to be rejected.</p>
+          <a data-src="packages/core/src/retry/classify.ts">classify.ts</a>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <p>Node 22 · TypeScript · Fastify · BullMQ · Postgres · Redis, running on a single VPS with Docker Compose.</p>
+      <p><a id="footer-repo" href="https://github.com/KevinLmn/webhook-delivery-service" rel="noopener">Source on GitHub</a></p>
+    </div>
+  </footer>
+</body>
+</html>

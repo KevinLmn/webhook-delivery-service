@@ -6,7 +6,7 @@ Node/TypeScript service that ingests events through an HTTP API and delivers the
 
 > Showcase project. Not a production service used by real customers.
 
-**Live demo**: https://vitrine-webhook-demo.fly.dev/ready (Fly.io single region `cdg` + Neon Postgres + Upstash Redis).
+**Live demo**: a public page where anyone can trigger an outage scenario and watch retries, the circuit breaker and dead letters play out in real time (see [Live demo page](#live-demo-page)).
 
 ## V1 features
 
@@ -136,17 +136,33 @@ flowchart LR
 
 Full design: [`docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md`](docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md).
 
+## Live demo page
+
+`apps/demo` serves a public page with a single button: **Run outage scenario**.
+
+- A run creates a fresh endpoint, then pushes 100 `order.created` events through the real API over 90 s.
+- The endpoint is a fake customer server on an internal port. It verifies every HMAC signature, then follows the same 4 phases as the chaos demo (200 → 500 → 50/50 → 200). 4 events carry a payload it rejects with `422`, to show the dead-letter path.
+- The service samples Postgres and Redis every second and streams the state to every open page over Server-Sent Events, so all visitors watch the same run.
+- Abuse limits: one run at a time, one run per IP every 3 minutes, and visitors can't supply a URL. The API, worker, Postgres and Redis are never exposed.
+- The last finished run is kept in Redis, so the page is never empty after a restart.
+
+The page is plain HTML/CSS/JS with no third-party code, served under a strict CSP.
+
 ## Deployment
 
-Multi-stage Docker image (`docker/Dockerfile`) shared by the API and the Worker. Fly topology: a single app with two process groups (`api` exposed over HTTP, `worker` in the background).
+A single VPS running `docker-compose.prod.yml`: Postgres, Redis, API, worker and the demo service, behind Caddy (automatic HTTPS). Only Caddy publishes ports.
 
 ```bash
-flyctl deploy --app vitrine-webhook-demo
+# on the server, next to docker-compose.prod.yml
+cat > .env <<'ENV'
+DOMAIN=webhooks.example.com
+POSTGRES_PASSWORD=<random>
+MASTER_ENCRYPTION_KEY=<openssl rand -base64 32>
+ENV
+docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-Drizzle migrations run automatically before each release via `release_command` in `fly.toml`. Secrets managed with `flyctl secrets set` (`DATABASE_URL`, `REDIS_URL`, `MASTER_ENCRYPTION_KEY`).
-
-CD configured: a push to `main` triggers `.github/workflows/deploy.yml`, which calls `flyctl deploy --remote-only`.
+The `migrate` service applies the Drizzle schema before the API, worker and demo start. Keep a copy of `MASTER_ENCRYPTION_KEY`: losing it makes the stored endpoint secrets undecryptable.
 
 ## Implementation plan
 
@@ -158,6 +174,7 @@ See [`docs/superpowers/plans/2026-05-09-webhook-delivery-hot-path-core.md`](docs
 apps/
   api/                        # Fastify, endpoints + events + replay routes
   worker/                     # BullMQ consumer, deliver orchestrator
+  demo/                       # public live demo page (SSE) + fake customer endpoint
 packages/
   core/                       # crypto, ids, retry schedule, signature, breaker logic
   db/                         # Drizzle schema + client
@@ -166,11 +183,12 @@ packages/
 scripts/
   cli/                        # utility CLIs (create-client)
   chaos/                      # demo:chaos (orchestrator + fake endpoint + PNG)
-docker/Dockerfile             # multi-stage API + Worker image
+docker/Dockerfile             # multi-stage image shared by api, worker and demo
 docker-compose.yml            # local dev (Postgres + Redis)
 docker-compose.demo.yml       # chaos demo stack (builds the image)
-fly.toml                      # Fly deployment (api + worker process groups)
-.github/workflows/            # ci.yml + deploy.yml
+docker-compose.prod.yml       # VPS stack: all services + Caddy
+deploy/Caddyfile              # reverse proxy, HTTPS, SSE flushing
+.github/workflows/            # ci.yml
 tests/integration/            # 16 Testcontainers tests
 docs/superpowers/             # specs and plans
 docs/chaos-runs/              # PNG of the latest chaos run

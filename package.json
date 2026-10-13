@@ -12,7 +12,7 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "test": "pnpm test:unit && pnpm test:integration",
-    "test:unit": "pnpm -r --filter './packages/**' test",
+    "test:unit": "pnpm -r --filter './packages/**' --filter @vitrine/demo test",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "dev": "concurrently -n api,worker -c blue,magenta 'pnpm --filter @vitrine/api dev' 'pnpm --filter @vitrine/worker dev'",
     "db:generate": "pnpm --filter @vitrine/db generate",
