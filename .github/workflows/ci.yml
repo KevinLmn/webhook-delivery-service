@@ -23,8 +23,10 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      # --ignore-scripts: skips native builds (canvas, only used by the chaos
+      # report script) that the runner can't compile and CI doesn't need.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Typecheck
         run: pnpm typecheck
@@ -41,3 +43,31 @@ jobs:
           # Testcontainers auto-detects the runner's Docker daemon.
           # This flag reduces log noise in CI.
           DEBUG: ''
+
+  deploy:
+    name: deploy to VPS
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # One deploy at a time; a newer push waits instead of racing the current one.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    environment:
+      name: production
+      url: https://webhook.kevinlemniai.fr
+    steps:
+      - name: Configure SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+
+      # The key is a forced command on the server: whatever we ask, it runs deploy/deploy.sh.
+      - name: Deploy
+        run: ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}"
+
+      - name: Public health check
+        run: curl -fsS --retry 10 --retry-delay 3 --retry-all-errors https://webhook.kevinlemniai.fr/health

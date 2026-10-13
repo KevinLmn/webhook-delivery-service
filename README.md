@@ -174,6 +174,8 @@ webhooks.example.com {
 }
 ```
 
+Continuous deployment: every push to `main` runs CI (typecheck, lint, unit and integration tests); when it passes, the `deploy` job SSHes into the VPS with a dedicated key that `authorized_keys` pins to [`deploy/deploy.sh`](deploy/deploy.sh) (forced command, no shell). The script pulls `main`, rebuilds the stack and waits for `/health`; the job then checks the public URL.
+
 The `migrate` service applies the Drizzle schema before the API, worker and demo start. Keep a copy of `MASTER_ENCRYPTION_KEY`: losing it makes the stored endpoint secrets undecryptable.
 
 ## Implementation plan
