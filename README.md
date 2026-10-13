@@ -92,7 +92,7 @@ The `pnpm demo:chaos` script orchestrates an end-to-end demo that:
 
 1. spawns a local fake endpoint scripted in 4 phases (200 OK → 500 → 50/50 → 200 OK);
 2. boots a Postgres + Redis + API + Worker stack via `docker-compose.demo.yml`;
-3. pushes 100 events over 5 s, samples the system state at 1 Hz for ~140 s;
+3. pushes 100 events spread over 90 s (so traffic keeps flowing through the outage), samples the system state at 1 Hz for ~140 s;
 4. generates an annotated PNG in `docs/chaos-runs/`.
 
 ```bash
@@ -103,11 +103,38 @@ The run takes ~3 min. The PNG illustrates the circuit breaker mechanics: opening
 
 ### Latest run
 
-![Latest chaos run](docs/chaos-runs/<FILE_STEM>.png)
+![Latest chaos run](docs/chaos-runs/2026-10-13-05-48.png)
+
+What it shows: the endpoint starts returning `500` at t=10 s; after 5 consecutive failures the breaker opens (~t=13 s) and the worker stops hammering it, so events queue up as `pending` instead of burning retries. After the 30 s cooldown the breaker goes `half_open`, the probe succeeds, it closes again and the backlog drains. Through the 50/50 phase, retries absorb the failures. End state: 100/100 delivered, 0 dead.
 
 ## Architecture
 
-See [`docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md`](docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md).
+```mermaid
+flowchart LR
+  Client[Client] -->|POST /events| API[API · Fastify]
+  API -->|idempotency check| R[(Redis)]
+  API -->|insert event| DB[(Postgres)]
+  API -->|enqueue| Q[BullMQ queue]
+  Q --> W[Worker · BullMQ]
+  W -->|check / update breaker| R
+  W -->|signed HTTP POST| EP[Client endpoint]
+  W -->|delivery_attempt + status| DB
+  W -->|retry with backoff| Q
+  W -->|attempts exhausted| DLQ[Dead letter]
+```
+
+- **API** (Fastify): ingestion (`POST /events`, `Idempotency-Key` required), endpoint CRUD, replay, reads. Answers `202` right away; delivery is asynchronous.
+- **Worker** (BullMQ, separate process, same image): checks the endpoint's circuit breaker, signs the payload (HMAC, Standard Webhooks headers), delivers it, logs every attempt.
+- **Postgres**: durable source of truth (`clients`, `endpoints`, `events`, `delivery_attempts`).
+- **Redis**: shared volatile state: breaker state, idempotency cache, BullMQ jobs.
+
+**Delivery rules**
+
+- Retry schedule: immediate → 1 s → 10 s → 1 min → 10 min → 1 h → 6 h (7 attempts, ±20% jitter), `Retry-After` honored.
+- `4xx` (except `429`) is permanent and goes straight to `dead`; `5xx`, `429`, timeouts and network errors are retried.
+- Circuit breaker per endpoint: 5 consecutive failures → `open` for 30 s (doubling on each relapse, capped at 30 min) → `half_open` probe → `closed`. State transitions run in an atomic Lua script so multiple workers share one breaker.
+
+Full design: [`docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md`](docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md).
 
 ## Deployment
 
