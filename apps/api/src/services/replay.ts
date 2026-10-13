@@ -1,4 +1,4 @@
-import { type DbClient, endpoints, events } from '@vitrine/db'
+import { events, type DbClient, endpoints } from '@vitrine/db'
 import type { DeliveryJobData } from '@vitrine/queue'
 import type { Queue } from 'bullmq'
 import { and, eq } from 'drizzle-orm'
@@ -33,7 +33,7 @@ export async function replayEvent(opts: {
   await opts.queue.add(
     'deliver',
     { eventId: opts.eventId },
-    { jobId: `${opts.eventId}-replay-${Date.now()}` }
+    { jobId: `${opts.eventId}-replay-${Date.now()}` },
   )
 
   return { kind: 'enqueued' }

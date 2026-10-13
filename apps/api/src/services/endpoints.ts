@@ -30,7 +30,7 @@ export async function createEndpoint(p: CreateEndpointParams): Promise<CreatedEn
       clientId: p.clientId,
       url: p.url,
       secretEncrypted,
-      description: p.description ?? null
+      description: p.description ?? null,
     })
     .returning()
   if (!row) throw new Error('insert failed')
@@ -39,7 +39,7 @@ export async function createEndpoint(p: CreateEndpointParams): Promise<CreatedEn
     url: row.url,
     secret,
     description: row.description,
-    createdAt: row.createdAt
+    createdAt: row.createdAt,
   }
 }
 
@@ -53,7 +53,7 @@ export async function listEndpoints(db: DbClient, clientId: string): Promise<End
 export async function archiveEndpoint(
   db: DbClient,
   clientId: string,
-  endpointId: string
+  endpointId: string,
 ): Promise<boolean> {
   const result = await db
     .update(endpoints)
@@ -62,8 +62,8 @@ export async function archiveEndpoint(
       and(
         eq(endpoints.id, endpointId),
         eq(endpoints.clientId, clientId),
-        isNull(endpoints.archivedAt)
-      )
+        isNull(endpoints.archivedAt),
+      ),
     )
     .returning({ id: endpoints.id })
   return result.length > 0
@@ -72,7 +72,7 @@ export async function archiveEndpoint(
 export async function findEndpointForClient(
   db: DbClient,
   clientId: string,
-  endpointId: string
+  endpointId: string,
 ): Promise<Endpoint | null> {
   const [row] = await db
     .select()
@@ -81,8 +81,8 @@ export async function findEndpointForClient(
       and(
         eq(endpoints.id, endpointId),
         eq(endpoints.clientId, clientId),
-        isNull(endpoints.archivedAt)
-      )
+        isNull(endpoints.archivedAt),
+      ),
     )
     .limit(1)
   return row ?? null

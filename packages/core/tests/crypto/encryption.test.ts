@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto'
-import { describe, it, expect } from 'vitest'
-import { encryptSecret, decryptSecret } from '../../src/crypto/encryption'
+import { describe, expect, it } from 'vitest'
+import { decryptSecret, encryptSecret } from '../../src/crypto/encryption'
 
 describe('encryption (AES-256-GCM)', () => {
   const masterKey = randomBytes(32)

@@ -58,6 +58,6 @@ export async function startFakeEndpoint(): Promise<FakeEndpoint> {
     },
     close: async () => {
       await app.close()
-    }
+    },
   }
 }

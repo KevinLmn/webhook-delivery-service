@@ -5,9 +5,9 @@
 // ============================================================================
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
 
-const IV_BYTES = 12   // recommended IV (nonce) size for GCM
-const TAG_BYTES = 16  // GCM authentication tag size
-const KEY_BYTES = 32  // AES-256 = 32-byte key
+const IV_BYTES = 12 // recommended IV (nonce) size for GCM
+const TAG_BYTES = 16 // GCM authentication tag size
+const KEY_BYTES = 32 // AES-256 = 32-byte key
 
 // Guard: the master key must be exactly 32 bytes.
 function assertKey(masterKey: Buffer): void {

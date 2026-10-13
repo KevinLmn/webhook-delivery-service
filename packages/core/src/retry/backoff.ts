@@ -5,13 +5,13 @@
 
 // Delay BEFORE each attempt. attempt 1 = immediate, then increasingly spaced out.
 export const RETRY_SCHEDULE_MS = [
-  0,            // attempt 1: immediate
-  1_000,        // attempt 2: 1s
-  10_000,       // attempt 3: 10s
-  60_000,       // attempt 4: 1min
-  600_000,      // attempt 5: 10min
-  3_600_000,    // attempt 6: 1h
-  21_600_000    // attempt 7: 6h
+  0, // attempt 1: immediate
+  1_000, // attempt 2: 1s
+  10_000, // attempt 3: 10s
+  60_000, // attempt 4: 1min
+  600_000, // attempt 5: 10min
+  3_600_000, // attempt 6: 1h
+  21_600_000, // attempt 7: 6h
 ] as const
 
 export const MAX_ATTEMPTS = RETRY_SCHEDULE_MS.length // 7 attempts max

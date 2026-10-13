@@ -1,13 +1,13 @@
+import { randomBytes } from 'node:crypto'
+import { createDbClient } from '@vitrine/db'
+import type { DbClient } from '@vitrine/db'
+import { createRedisClient } from '@vitrine/queue'
+import type { Worker } from 'bullmq'
+import type { FastifyInstance } from 'fastify'
+import type { Redis } from 'ioredis'
+import pino from 'pino'
 import { buildApp } from '../../../apps/api/src/server'
 import { startWorker } from '../../../apps/worker/src/worker'
-import { createDbClient } from '@vitrine/db'
-import { createRedisClient } from '@vitrine/queue'
-import pino from 'pino'
-import type { FastifyInstance } from 'fastify'
-import type { Worker } from 'bullmq'
-import type { Redis } from 'ioredis'
-import { randomBytes } from 'node:crypto'
-import type { DbClient } from '@vitrine/db'
 
 export interface AppFixture {
   app: FastifyInstance
@@ -57,6 +57,6 @@ export async function startApp(opts: {
       // that hook and surface as "Connection is closed".
       await worker.close()
       await app.close()
-    }
+    },
   }
 }

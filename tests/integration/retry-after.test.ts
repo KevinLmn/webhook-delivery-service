@@ -4,7 +4,7 @@ import {
   seedClient,
   seedEndpoint,
   startApp,
-  startFakeEndpoint
+  startFakeEndpoint,
 } from '@vitrine/test-helpers'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -21,7 +21,7 @@ describe('429 Retry-After is respected', () => {
     fake = await startFakeEndpoint()
     app = await startApp({
       databaseUrl: process.env.DATABASE_URL!,
-      redisUrl: process.env.REDIS_URL!
+      redisUrl: process.env.REDIS_URL!,
     })
   })
 
@@ -35,7 +35,7 @@ describe('429 Retry-After is respected', () => {
     const { endpointId } = await seedEndpoint(app.db, {
       clientId,
       url: fake.url,
-      masterKey: app.masterKey
+      masterKey: app.masterKey,
     })
 
     // Initially throttle with Retry-After: 1 (seconds). The schedule override's
@@ -49,13 +49,13 @@ describe('429 Retry-After is respected', () => {
       headers: {
         'content-type': 'application/json',
         authorization: `Bearer ${apiKey}`,
-        'idempotency-key': 'retry-after-1'
+        'idempotency-key': 'retry-after-1',
       },
       body: JSON.stringify({
         endpoint_id: endpointId,
         event_type: 'order.shipped',
-        payload: { id: 1 }
-      })
+        payload: { id: 1 },
+      }),
     })
     expect(res.status).toBe(202)
     const { id: eventId } = (await res.json()) as { id: string }
@@ -63,7 +63,7 @@ describe('429 Retry-After is respected', () => {
     let detail: EventDetail | null = null
     await waitFor(async () => {
       detail = (await fetch(`${app.baseUrl}/events/${eventId}`, {
-        headers: { authorization: `Bearer ${apiKey}` }
+        headers: { authorization: `Bearer ${apiKey}` },
       }).then((r) => r.json())) as EventDetail
       return detail.status === 'delivered'
     }, 5_000)

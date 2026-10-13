@@ -13,17 +13,17 @@ export type BreakerStateName = 'closed' | 'open' | 'half_open'
 
 export interface BreakerState {
   state: BreakerStateName
-  openedAt: number | null   // when we went "open" (to compute when the cooldown ends)
-  failCount: number         // number of consecutive failures (counted in "closed")
-  openDurationMs: number    // current cooldown duration (doubles on each relapse)
+  openedAt: number | null // when we went "open" (to compute when the cooldown ends)
+  failCount: number // number of consecutive failures (counted in "closed")
+  openDurationMs: number // current cooldown duration (doubles on each relapse)
 }
 
 // The events that can be sent to the breaker.
 export type BreakerEvent = 'success' | 'failure' | 'read'
 
-export const FAIL_THRESHOLD = 5          // 5 consecutive failures → open
-export const INITIAL_OPEN_MS = 30_000    // initial cooldown: 30s
-export const MAX_OPEN_MS = 30 * 60_000   // cooldown cap: 30 min
+export const FAIL_THRESHOLD = 5 // 5 consecutive failures → open
+export const INITIAL_OPEN_MS = 30_000 // initial cooldown: 30s
+export const MAX_OPEN_MS = 30 * 60_000 // cooldown cap: 30 min
 
 // Initial state: closed (all good).
 export function defaultState(): BreakerState {
@@ -43,7 +43,7 @@ export function transition(state: BreakerState, event: BreakerEvent, nowMs: numb
           state: 'open',
           openedAt: nowMs,
           failCount: 0,
-          openDurationMs: INITIAL_OPEN_MS
+          openDurationMs: INITIAL_OPEN_MS,
         }
       }
       return { ...state, failCount: next } // still below the threshold
@@ -62,7 +62,7 @@ export function transition(state: BreakerState, event: BreakerEvent, nowMs: numb
           state: 'half_open',
           openedAt: null,
           failCount: 0,
-          openDurationMs: state.openDurationMs
+          openDurationMs: state.openDurationMs,
         }
       }
       return state // still cooling down

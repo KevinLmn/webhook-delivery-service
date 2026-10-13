@@ -1,8 +1,8 @@
-import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
-import { GenericContainer, type StartedTestContainer } from 'testcontainers'
 import { execSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
+import { GenericContainer, type StartedTestContainer } from 'testcontainers'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -18,7 +18,7 @@ export interface StartedInfra {
 export async function startInfra(): Promise<StartedInfra> {
   const [pg, redis] = await Promise.all([
     new PostgreSqlContainer('postgres:16-alpine').start(),
-    new GenericContainer('redis:7-alpine').withExposedPorts(6379).start()
+    new GenericContainer('redis:7-alpine').withExposedPorts(6379).start(),
   ])
 
   const databaseUrl = pg.getConnectionUri()
@@ -32,7 +32,7 @@ export async function startInfra(): Promise<StartedInfra> {
   execSync('pnpm drizzle-kit push --force', {
     cwd: drizzleDir,
     env: { ...process.env, DATABASE_URL: databaseUrl },
-    stdio: 'inherit'
+    stdio: 'inherit',
   })
 
   return {
@@ -42,6 +42,6 @@ export async function startInfra(): Promise<StartedInfra> {
     redisUrl,
     stop: async () => {
       await Promise.all([pg.stop(), redis.stop()])
-    }
+    },
   }
 }

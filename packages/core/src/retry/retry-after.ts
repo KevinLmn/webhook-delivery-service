@@ -3,7 +3,11 @@
 //  Two possible forms: a number of seconds, OR an HTTP date.
 //  Returns a delay in ms, or null if invalid / out of bounds.
 // ============================================================================
-export function parseRetryAfter(header: string | null, nowMs: number, maxMs: number): number | null {
+export function parseRetryAfter(
+  header: string | null,
+  nowMs: number,
+  maxMs: number,
+): number | null {
   if (header === null) return null
 
   // Form 1: "Retry-After: 120" (seconds).

@@ -1,13 +1,13 @@
+import { type Outcome, decryptSecret, newId, parseRetryAfter } from '@vitrine/core'
+import { events, type DbClient, deliveryAttempts, endpoints } from '@vitrine/db'
+import { type DeliveryJobData, recordOutcome } from '@vitrine/queue'
+import type { Job } from 'bullmq'
 // ============================================================================
 //  deliver.ts — ORCHESTRATION of ONE delivery attempt.
 //  Chains: read breaker → (deliver) → record the attempt → update breaker
 //  → update event. Returns a DECISION (success/retry/dlq/breaker_skip) to the worker.
 // ============================================================================
 import { eq, sql } from 'drizzle-orm'
-import { deliveryAttempts, endpoints, events, type DbClient } from '@vitrine/db'
-import { recordOutcome, type DeliveryJobData } from '@vitrine/queue'
-import { decryptSecret, newId, parseRetryAfter, type Outcome } from '@vitrine/core'
-import type { Job } from 'bullmq'
 import type { Redis } from 'ioredis'
 import type { Logger } from 'pino'
 import { deliverOnce } from './http-client'
@@ -24,14 +24,14 @@ export interface DeliverContext {
 
 // The possible decisions returned to the worker:
 export type DeliverResult =
-  | { kind: 'success' }                                        // delivered → return
+  | { kind: 'success' } // delivered → return
   | { kind: 'retry'; reason: Outcome['kind']; delayOverrideMs?: number } // try again
-  | { kind: 'dlq'; reason: Outcome['kind'] }                  // terminal → event "dead"
-  | { kind: 'breaker_skip'; remainingMs: number }             // endpoint cut off → postpone
+  | { kind: 'dlq'; reason: Outcome['kind'] } // terminal → event "dead"
+  | { kind: 'breaker_skip'; remainingMs: number } // endpoint cut off → postpone
 
 export async function deliver(
   ctx: DeliverContext,
-  job: Job<DeliveryJobData>
+  job: Job<DeliveryJobData>,
 ): Promise<DeliverResult> {
   const eventId = job.data.eventId
 
@@ -80,7 +80,7 @@ export async function deliver(
     secret,
     eventId,
     timestamp,
-    timeoutMs: TIMEOUT_MS
+    timeoutMs: TIMEOUT_MS,
   })
 
   // 4) Record this attempt. attemptNumber = max(existing) + 1.
@@ -97,7 +97,7 @@ export async function deliver(
     statusCode: result.statusCode,
     durationMs: result.durationMs,
     errorClass: result.outcome.kind === 'success' ? null : result.outcome.kind,
-    responseBodyExcerpt: result.responseBodyExcerpt
+    responseBodyExcerpt: result.responseBodyExcerpt,
   })
 
   // 5) Depending on the result: update breaker + update event + decision.

@@ -1,9 +1,9 @@
-import { afterEach, describe, it, expect } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import {
-  backoffMs,
   RETRY_SCHEDULE_MS,
+  backoffMs,
+  getActiveSchedule,
   setRetryScheduleOverride,
-  getActiveSchedule
 } from '../../src/retry/backoff'
 
 afterEach(() => setRetryScheduleOverride(null))

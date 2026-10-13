@@ -1,10 +1,10 @@
-import { newId, hashApiKey, encryptSecret } from '@vitrine/core'
-import { clients, endpoints, type DbClient } from '@vitrine/db'
 import { randomBytes } from 'node:crypto'
+import { encryptSecret, hashApiKey, newId } from '@vitrine/core'
+import { type DbClient, clients, endpoints } from '@vitrine/db'
 
 export async function seedClient(
   db: DbClient,
-  opts: { name: string }
+  opts: { name: string },
 ): Promise<{ clientId: string; apiKey: string }> {
   const apiKey = `cl_secret_${randomBytes(24).toString('base64url')}`
   const apiKeyHash = await hashApiKey(apiKey)
@@ -15,7 +15,7 @@ export async function seedClient(
 
 export async function seedEndpoint(
   db: DbClient,
-  opts: { clientId: string; url: string; masterKey: Buffer }
+  opts: { clientId: string; url: string; masterKey: Buffer },
 ): Promise<{ endpointId: string; secret: string }> {
   const secret = `whsec_${randomBytes(24).toString('base64url')}`
   const secretEncrypted = encryptSecret(secret, opts.masterKey)

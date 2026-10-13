@@ -4,7 +4,7 @@ import {
   seedClient,
   seedEndpoint,
   startApp,
-  startFakeEndpoint
+  startFakeEndpoint,
 } from '@vitrine/test-helpers'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -16,7 +16,7 @@ describe('happy path', () => {
     fake = await startFakeEndpoint()
     app = await startApp({
       databaseUrl: process.env.DATABASE_URL!,
-      redisUrl: process.env.REDIS_URL!
+      redisUrl: process.env.REDIS_URL!,
     })
   })
 
@@ -30,7 +30,7 @@ describe('happy path', () => {
     const { endpointId } = await seedEndpoint(app.db, {
       clientId,
       url: fake.url,
-      masterKey: app.masterKey
+      masterKey: app.masterKey,
     })
     fake.setResponse({ kind: 'ok', statusCode: 200 })
 
@@ -39,20 +39,20 @@ describe('happy path', () => {
       headers: {
         'content-type': 'application/json',
         authorization: `Bearer ${apiKey}`,
-        'idempotency-key': 'happy-1'
+        'idempotency-key': 'happy-1',
       },
       body: JSON.stringify({
         endpoint_id: endpointId,
         event_type: 'order.shipped',
-        payload: { id: 1 }
-      })
+        payload: { id: 1 },
+      }),
     })
     expect(res.status).toBe(202)
     const { id: eventId } = (await res.json()) as { id: string }
 
     await waitFor(async () => {
       const detail = (await fetch(`${app.baseUrl}/events/${eventId}`, {
-        headers: { authorization: `Bearer ${apiKey}` }
+        headers: { authorization: `Bearer ${apiKey}` },
       }).then((r) => r.json())) as { status: string }
       return detail.status === 'delivered'
     }, 10_000)

@@ -1,22 +1,17 @@
+import { getMaxAttempts } from '@vitrine/core'
+import { events, type DbClient, createDbClient } from '@vitrine/db'
+import { type DeliveryJobData, QUEUE_NAME, createRedisClient, workerSettings } from '@vitrine/queue'
 // ============================================================================
 //  worker.ts — The BullMQ CONSUMER: takes jobs, calls deliver(), and
 //  turns the decision into CONTROL of BullMQ retries. ⭐ The DelayedError trick.
 // ============================================================================
 import { DelayedError, UnrecoverableError, Worker } from 'bullmq'
 import type { WorkerOptions } from 'bullmq'
-import {
-  QUEUE_NAME,
-  createRedisClient,
-  workerSettings,
-  type DeliveryJobData
-} from '@vitrine/queue'
-import { createDbClient, events, type DbClient } from '@vitrine/db'
 import { and, eq } from 'drizzle-orm'
+import type { Redis } from 'ioredis'
 import pino from 'pino'
 import type { Logger } from 'pino'
-import type { Redis } from 'ioredis'
 import { deliver } from './deliver'
-import { getMaxAttempts } from '@vitrine/core'
 
 export interface StartWorkerOptions {
   db?: DbClient
@@ -68,8 +63,8 @@ export async function startWorker(opts: StartWorkerOptions): Promise<Worker<Deli
     {
       connection: redis,
       concurrency: 10, // up to 10 deliveries in parallel
-      settings: workerSettings() as NonNullable<WorkerOptions['settings']>
-    }
+      settings: workerSettings() as NonNullable<WorkerOptions['settings']>,
+    },
   )
 
   // Safety net: when BullMQ has exhausted ALL attempts (5xx/network errors
@@ -85,7 +80,10 @@ export async function startWorker(opts: StartWorkerOptions): Promise<Worker<Deli
         // the `and(... status 'pending')` avoids overwriting an already delivered/dead event
         .where(and(eq(events.id, job.data.eventId), eq(events.status, 'pending')))
         .catch((dbErr) => {
-          logger.error({ jobId: job.id, err: (dbErr as Error).message }, 'failed to mark event dead')
+          logger.error(
+            { jobId: job.id, err: (dbErr as Error).message },
+            'failed to mark event dead',
+          )
         })
     }
   })

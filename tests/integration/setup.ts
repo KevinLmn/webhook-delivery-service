@@ -1,5 +1,5 @@
 import { setRetryScheduleOverride } from '@vitrine/core'
-import { startInfra, type StartedInfra } from '@vitrine/test-helpers'
+import { type StartedInfra, startInfra } from '@vitrine/test-helpers'
 
 let infra: StartedInfra | null = null
 

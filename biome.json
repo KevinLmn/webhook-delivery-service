@@ -11,5 +11,16 @@
       "suspicious": { "noConsoleLog": "warn" }
     }
   },
+  "overrides": [
+    {
+      "include": ["tests/**", "**/tests/**", "scripts/**"],
+      "linter": {
+        "rules": {
+          "style": { "noNonNullAssertion": "off" },
+          "suspicious": { "noConsoleLog": "off" }
+        }
+      }
+    }
+  ],
   "javascript": { "formatter": { "quoteStyle": "single", "semicolons": "asNeeded" } }
 }

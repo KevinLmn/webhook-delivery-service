@@ -1,9 +1,9 @@
+import { type Outcome, classifyOutcome, signWebhook } from '@vitrine/core'
 // ============================================================================
 //  http-client.ts — ONE HTTP delivery attempt (one signed POST, once).
 //  Decides NOTHING (no retry, no breaker): it delivers and reports the result.
 // ============================================================================
 import { request } from 'undici' // fast HTTP client for Node
-import { classifyOutcome, signWebhook, type Outcome } from '@vitrine/core'
 
 export interface DeliverHttpParams {
   url: string
@@ -15,8 +15,8 @@ export interface DeliverHttpParams {
 }
 
 export interface HttpDeliveryResult {
-  outcome: Outcome                 // category (success / 5xx / 4xx / throttle / timeout / network)
-  statusCode: number | null        // null if no response (network error)
+  outcome: Outcome // category (success / 5xx / 4xx / throttle / timeout / network)
+  statusCode: number | null // null if no response (network error)
   durationMs: number
   responseBodyExcerpt: string | null
 }
@@ -36,11 +36,11 @@ export async function deliverOnce(p: DeliverHttpParams): Promise<HttpDeliveryRes
         'content-type': 'application/json',
         'webhook-id': p.eventId,
         'webhook-timestamp': String(p.timestamp),
-        'webhook-signature': sig
+        'webhook-signature': sig,
       },
       body: p.body,
       bodyTimeout: p.timeoutMs,
-      headersTimeout: p.timeoutMs
+      headersTimeout: p.timeoutMs,
     })
     const text = await res.body.text()
     const excerpt = text.length > EXCERPT_MAX ? text.slice(0, EXCERPT_MAX) : text
@@ -59,11 +59,11 @@ export async function deliverOnce(p: DeliverHttpParams): Promise<HttpDeliveryRes
       outcome: classifyOutcome({
         kind: 'response',
         statusCode: res.statusCode,
-        ...(retryAfter !== undefined ? { retryAfter } : {})
+        ...(retryAfter !== undefined ? { retryAfter } : {}),
       }),
       statusCode: res.statusCode,
       durationMs: Date.now() - start,
-      responseBodyExcerpt: excerpt.length > 0 ? excerpt : null
+      responseBodyExcerpt: excerpt.length > 0 ? excerpt : null,
     }
   } catch (err) {
     // 5) No response (timeout, DNS, refused...) → classify the error.
@@ -72,7 +72,7 @@ export async function deliverOnce(p: DeliverHttpParams): Promise<HttpDeliveryRes
       outcome: classifyOutcome({ kind: 'error', errorCode: code }),
       statusCode: null,
       durationMs: Date.now() - start,
-      responseBodyExcerpt: null
+      responseBodyExcerpt: null,
     }
   }
 }

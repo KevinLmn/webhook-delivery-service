@@ -4,7 +4,7 @@ import {
   seedClient,
   seedEndpoint,
   startApp,
-  startFakeEndpoint
+  startFakeEndpoint,
 } from '@vitrine/test-helpers'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -16,7 +16,7 @@ describe('idempotency', () => {
     fake = await startFakeEndpoint()
     app = await startApp({
       databaseUrl: process.env.DATABASE_URL!,
-      redisUrl: process.env.REDIS_URL!
+      redisUrl: process.env.REDIS_URL!,
     })
   })
 
@@ -30,17 +30,17 @@ describe('idempotency', () => {
     const { endpointId } = await seedEndpoint(app.db, {
       clientId,
       url: fake.url,
-      masterKey: app.masterKey
+      masterKey: app.masterKey,
     })
     const body = JSON.stringify({
       endpoint_id: endpointId,
       event_type: 'order.shipped',
-      payload: { id: 1 }
+      payload: { id: 1 },
     })
     const headers = {
       'content-type': 'application/json',
       authorization: `Bearer ${apiKey}`,
-      'idempotency-key': 'idem-hit-1'
+      'idempotency-key': 'idem-hit-1',
     }
 
     const r1 = await fetch(`${app.baseUrl}/events`, { method: 'POST', headers, body })
@@ -54,10 +54,9 @@ describe('idempotency', () => {
     expect(id2).toBe(id1)
 
     // Single event row in DB (verified via the list API filtered by endpoint).
-    const list = (await fetch(
-      `${app.baseUrl}/events?endpoint_id=${endpointId}`,
-      { headers: { authorization: `Bearer ${apiKey}` } }
-    ).then((r) => r.json())) as Array<{ id: string }>
+    const list = (await fetch(`${app.baseUrl}/events?endpoint_id=${endpointId}`, {
+      headers: { authorization: `Bearer ${apiKey}` },
+    }).then((r) => r.json())) as Array<{ id: string }>
     expect(list.length).toBe(1)
     expect(list[0]!.id).toBe(id1)
   })
@@ -67,12 +66,12 @@ describe('idempotency', () => {
     const { endpointId } = await seedEndpoint(app.db, {
       clientId,
       url: fake.url,
-      masterKey: app.masterKey
+      masterKey: app.masterKey,
     })
     const headers = {
       'content-type': 'application/json',
       authorization: `Bearer ${apiKey}`,
-      'idempotency-key': 'idem-conflict-1'
+      'idempotency-key': 'idem-conflict-1',
     }
 
     const r1 = await fetch(`${app.baseUrl}/events`, {
@@ -81,8 +80,8 @@ describe('idempotency', () => {
       body: JSON.stringify({
         endpoint_id: endpointId,
         event_type: 'order.shipped',
-        payload: { id: 1 }
-      })
+        payload: { id: 1 },
+      }),
     })
     expect(r1.status).toBe(202)
 
@@ -92,8 +91,8 @@ describe('idempotency', () => {
       body: JSON.stringify({
         endpoint_id: endpointId,
         event_type: 'order.shipped',
-        payload: { id: 2 }
-      })
+        payload: { id: 2 },
+      }),
     })
     expect(r2.status).toBe(422)
   })
@@ -103,7 +102,7 @@ describe('idempotency', () => {
     const { endpointId } = await seedEndpoint(app.db, {
       clientId,
       url: fake.url,
-      masterKey: app.masterKey
+      masterKey: app.masterKey,
     })
     const r = await fetch(`${app.baseUrl}/events`, {
       method: 'POST',
@@ -111,8 +110,8 @@ describe('idempotency', () => {
       body: JSON.stringify({
         endpoint_id: endpointId,
         event_type: 'order.shipped',
-        payload: { id: 1 }
-      })
+        payload: { id: 1 },
+      }),
     })
     expect(r.status).toBe(400)
   })

@@ -4,7 +4,7 @@ import {
   seedClient,
   seedEndpoint,
   startApp,
-  startFakeEndpoint
+  startFakeEndpoint,
 } from '@vitrine/test-helpers'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -21,7 +21,7 @@ describe('replay variants (dead/delivered/pending)', () => {
     fake = await startFakeEndpoint()
     app = await startApp({
       databaseUrl: process.env.DATABASE_URL!,
-      redisUrl: process.env.REDIS_URL!
+      redisUrl: process.env.REDIS_URL!,
     })
   })
 
@@ -35,7 +35,7 @@ describe('replay variants (dead/delivered/pending)', () => {
     const { endpointId } = await seedEndpoint(app.db, {
       clientId,
       url: fake.url,
-      masterKey: app.masterKey
+      masterKey: app.masterKey,
     })
 
     // 4xx marks the event dead in a single attempt (no retries).
@@ -46,20 +46,20 @@ describe('replay variants (dead/delivered/pending)', () => {
       headers: {
         'content-type': 'application/json',
         authorization: `Bearer ${apiKey}`,
-        'idempotency-key': 'replay-dead-1'
+        'idempotency-key': 'replay-dead-1',
       },
       body: JSON.stringify({
         endpoint_id: endpointId,
         event_type: 'order.shipped',
-        payload: { id: 1 }
-      })
+        payload: { id: 1 },
+      }),
     })
     expect(ingest.status).toBe(202)
     const { id: eventId } = (await ingest.json()) as { id: string }
 
     await waitFor(async () => {
       const detail = (await fetch(`${app.baseUrl}/events/${eventId}`, {
-        headers: { authorization: `Bearer ${apiKey}` }
+        headers: { authorization: `Bearer ${apiKey}` },
       }).then((r) => r.json())) as EventDetail
       return detail.status === 'dead'
     }, 5_000)
@@ -70,13 +70,13 @@ describe('replay variants (dead/delivered/pending)', () => {
 
     const replay = await fetch(`${app.baseUrl}/events/${eventId}/replay`, {
       method: 'POST',
-      headers: { authorization: `Bearer ${apiKey}` }
+      headers: { authorization: `Bearer ${apiKey}` },
     })
     expect(replay.status).toBe(200)
 
     await waitFor(async () => {
       const detail = (await fetch(`${app.baseUrl}/events/${eventId}`, {
-        headers: { authorization: `Bearer ${apiKey}` }
+        headers: { authorization: `Bearer ${apiKey}` },
       }).then((r) => r.json())) as EventDetail
       return detail.status === 'delivered'
     }, 5_000)
@@ -87,7 +87,7 @@ describe('replay variants (dead/delivered/pending)', () => {
     const { endpointId } = await seedEndpoint(app.db, {
       clientId,
       url: fake.url,
-      masterKey: app.masterKey
+      masterKey: app.masterKey,
     })
     fake.setResponse({ kind: 'ok' })
 
@@ -96,20 +96,20 @@ describe('replay variants (dead/delivered/pending)', () => {
       headers: {
         'content-type': 'application/json',
         authorization: `Bearer ${apiKey}`,
-        'idempotency-key': 'replay-delivered-1'
+        'idempotency-key': 'replay-delivered-1',
       },
       body: JSON.stringify({
         endpoint_id: endpointId,
         event_type: 'order.shipped',
-        payload: { id: 2 }
-      })
+        payload: { id: 2 },
+      }),
     })
     expect(ingest.status).toBe(202)
     const { id: eventId } = (await ingest.json()) as { id: string }
 
     await waitFor(async () => {
       const detail = (await fetch(`${app.baseUrl}/events/${eventId}`, {
-        headers: { authorization: `Bearer ${apiKey}` }
+        headers: { authorization: `Bearer ${apiKey}` },
       }).then((r) => r.json())) as EventDetail
       return detail.status === 'delivered'
     }, 5_000)
@@ -118,7 +118,7 @@ describe('replay variants (dead/delivered/pending)', () => {
 
     const replay = await fetch(`${app.baseUrl}/events/${eventId}/replay`, {
       method: 'POST',
-      headers: { authorization: `Bearer ${apiKey}` }
+      headers: { authorization: `Bearer ${apiKey}` },
     })
     expect(replay.status).toBe(200)
 
@@ -127,7 +127,7 @@ describe('replay variants (dead/delivered/pending)', () => {
     await waitFor(async () => fake.received().length > beforeCount, 5_000)
 
     const detail = (await fetch(`${app.baseUrl}/events/${eventId}`, {
-      headers: { authorization: `Bearer ${apiKey}` }
+      headers: { authorization: `Bearer ${apiKey}` },
     }).then((r) => r.json())) as EventDetail
     expect(detail.status).toBe('delivered')
     expect(detail.attempts.length).toBeGreaterThanOrEqual(2)
@@ -138,7 +138,7 @@ describe('replay variants (dead/delivered/pending)', () => {
     const { endpointId } = await seedEndpoint(app.db, {
       clientId,
       url: fake.url,
-      masterKey: app.masterKey
+      masterKey: app.masterKey,
     })
 
     // Make the fake hold the request open so the worker stays in-flight while
@@ -150,13 +150,13 @@ describe('replay variants (dead/delivered/pending)', () => {
       headers: {
         'content-type': 'application/json',
         authorization: `Bearer ${apiKey}`,
-        'idempotency-key': 'replay-pending-1'
+        'idempotency-key': 'replay-pending-1',
       },
       body: JSON.stringify({
         endpoint_id: endpointId,
         event_type: 'order.shipped',
-        payload: { id: 3 }
-      })
+        payload: { id: 3 },
+      }),
     })
     expect(ingest.status).toBe(202)
     const { id: eventId } = (await ingest.json()) as { id: string }
@@ -164,13 +164,13 @@ describe('replay variants (dead/delivered/pending)', () => {
     // Confirm the worker has begun the request (status still pending).
     await waitFor(async () => fake.received().length >= 1, 5_000)
     const detail = (await fetch(`${app.baseUrl}/events/${eventId}`, {
-      headers: { authorization: `Bearer ${apiKey}` }
+      headers: { authorization: `Bearer ${apiKey}` },
     }).then((r) => r.json())) as EventDetail
     expect(detail.status).toBe('pending')
 
     const replay = await fetch(`${app.baseUrl}/events/${eventId}/replay`, {
       method: 'POST',
-      headers: { authorization: `Bearer ${apiKey}` }
+      headers: { authorization: `Bearer ${apiKey}` },
     })
     expect(replay.status).toBe(409)
     const body = (await replay.json()) as { error: string }

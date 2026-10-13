@@ -8,7 +8,7 @@ export const replayRoutes: FastifyPluginAsync = async (app) => {
       db: app.db,
       queue: app.deliveryQueue,
       clientId: request.clientId,
-      eventId: request.params.id
+      eventId: request.params.id,
     })
     if (result.kind === 'not_found') return reply.code(404).send({ error: 'not_found' })
     if (result.kind === 'conflict_pending') {

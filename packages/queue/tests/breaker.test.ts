@@ -1,6 +1,6 @@
-import { afterAll, beforeAll, describe, it, expect } from 'vitest'
-import { GenericContainer, type StartedTestContainer } from 'testcontainers'
 import { Redis } from 'ioredis'
+import { GenericContainer, type StartedTestContainer } from 'testcontainers'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { recordOutcome } from '../src/breaker'
 
 describe('record_outcome.lua', () => {
@@ -12,7 +12,7 @@ describe('record_outcome.lua', () => {
     redis = new Redis({
       host: container.getHost(),
       port: container.getMappedPort(6379),
-      maxRetriesPerRequest: null
+      maxRetriesPerRequest: null,
     })
   }, 60_000)
 

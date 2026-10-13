@@ -4,7 +4,7 @@ import {
   seedClient,
   seedEndpoint,
   startApp,
-  startFakeEndpoint
+  startFakeEndpoint,
 } from '@vitrine/test-helpers'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -21,7 +21,7 @@ describe('dlq after exhausting retries', () => {
     fake = await startFakeEndpoint()
     app = await startApp({
       databaseUrl: process.env.DATABASE_URL!,
-      redisUrl: process.env.REDIS_URL!
+      redisUrl: process.env.REDIS_URL!,
     })
   })
 
@@ -35,7 +35,7 @@ describe('dlq after exhausting retries', () => {
     const { endpointId } = await seedEndpoint(app.db, {
       clientId,
       url: fake.url,
-      masterKey: app.masterKey
+      masterKey: app.masterKey,
     })
 
     // Schedule (overridden in setup): [0, 50, 100, 200, 400, 800, 1600] ms
@@ -47,13 +47,13 @@ describe('dlq after exhausting retries', () => {
       headers: {
         'content-type': 'application/json',
         authorization: `Bearer ${apiKey}`,
-        'idempotency-key': 'dlq-1'
+        'idempotency-key': 'dlq-1',
       },
       body: JSON.stringify({
         endpoint_id: endpointId,
         event_type: 'order.shipped',
-        payload: { id: 1 }
-      })
+        payload: { id: 1 },
+      }),
     })
     expect(res.status).toBe(202)
     const { id: eventId } = (await res.json()) as { id: string }
@@ -61,7 +61,7 @@ describe('dlq after exhausting retries', () => {
     let detail: EventDetail | null = null
     await waitFor(async () => {
       detail = (await fetch(`${app.baseUrl}/events/${eventId}`, {
-        headers: { authorization: `Bearer ${apiKey}` }
+        headers: { authorization: `Bearer ${apiKey}` },
       }).then((r) => r.json())) as EventDetail
       return detail.status === 'dead' && detail.attempts.length === 7
     }, 10_000)

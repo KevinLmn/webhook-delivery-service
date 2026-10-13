@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest'
-import { newId, isId } from '../src/ids'
+import { describe, expect, it } from 'vitest'
+import { isId, newId } from '../src/ids'
 
 describe('ids', () => {
-  it("generates an id with the right prefix", () => {
+  it('generates an id with the right prefix', () => {
     const id = newId('evt')
     expect(id).toMatch(/^evt_[0-9A-HJKMNP-TV-Z]{26}$/)
   })

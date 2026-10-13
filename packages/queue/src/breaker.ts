@@ -3,10 +3,10 @@
 //  Loads the script into Redis ONCE, then calls it by its SHA (EVALSHA).
 // ============================================================================
 import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import type { Redis } from 'ioredis'
+import { fileURLToPath } from 'node:url'
 import type { BreakerState } from '@vitrine/core'
+import type { Redis } from 'ioredis'
 
 // Path to the .lua next to this file → its content is read at startup.
 const __filename = fileURLToPath(import.meta.url)
@@ -53,7 +53,7 @@ export async function recordOutcome(
   redis: Redis,
   endpointId: string,
   event: BreakerEvent,
-  nowMs: number
+  nowMs: number,
 ): Promise<BreakerState> {
   let sha = await loadScript(redis)
   // The args order must match ARGV[1..6] in the .lua.
@@ -63,7 +63,7 @@ export async function recordOutcome(
     String(configOverride?.initialOpenMs ?? DEFAULT_INITIAL_OPEN_MS),
     String(configOverride?.maxOpenMs ?? DEFAULT_MAX_OPEN_MS),
     String(configOverride?.failThreshold ?? DEFAULT_FAIL_THRESHOLD),
-    String(TTL_SEC)
+    String(TTL_SEC),
   ]
   let raw: string
   try {

@@ -2,7 +2,7 @@
 //  events.ts — Event routes: POST /events (ingestion) + GET (list/detail).
 // ============================================================================
 import { IngestEventSchema } from '@vitrine/core'
-import { type DbClient, deliveryAttempts, endpoints, events } from '@vitrine/db'
+import { events, type DbClient, deliveryAttempts, endpoints } from '@vitrine/db'
 import { type SQL, and, desc, eq } from 'drizzle-orm'
 import type { FastifyPluginAsync } from 'fastify'
 import { ingestEvent } from '../services/ingestion'
@@ -40,7 +40,7 @@ export const eventsRoutes: FastifyPluginAsync = async (app) => {
       endpointId: parsed.data.endpoint_id,
       eventType: parsed.data.event_type,
       payload: parsed.data.payload,
-      idempotencyKey: idemKey
+      idempotencyKey: idemKey,
     })
 
     // 5) Map the result to an HTTP status code (see your note "HTTP - Status Codes").
@@ -55,7 +55,7 @@ export const eventsRoutes: FastifyPluginAsync = async (app) => {
     return reply.code(status).send({
       id: result.eventId,
       status: 'pending',
-      endpoint_id: parsed.data.endpoint_id
+      endpoint_id: parsed.data.endpoint_id,
     })
   })
 
@@ -95,7 +95,7 @@ async function listEventsForClient(db: DbClient, clientId: string, query: Events
       status: events.status,
       delivered_at: events.deliveredAt,
       dead_at: events.deadAt,
-      created_at: events.createdAt
+      created_at: events.createdAt,
     })
     .from(events)
     .innerJoin(endpoints, eq(endpoints.id, events.endpointId))
@@ -119,7 +119,7 @@ async function findEventDetail(db: DbClient, clientId: string, eventId: string) 
       status: events.status,
       delivered_at: events.deliveredAt,
       dead_at: events.deadAt,
-      created_at: events.createdAt
+      created_at: events.createdAt,
     })
     .from(events)
     .innerJoin(endpoints, eq(endpoints.id, events.endpointId))
@@ -134,7 +134,7 @@ async function findEventDetail(db: DbClient, clientId: string, eventId: string) 
       status_code: deliveryAttempts.statusCode,
       duration_ms: deliveryAttempts.durationMs,
       error_class: deliveryAttempts.errorClass,
-      response_body_excerpt: deliveryAttempts.responseBodyExcerpt
+      response_body_excerpt: deliveryAttempts.responseBodyExcerpt,
     })
     .from(deliveryAttempts)
     .where(eq(deliveryAttempts.eventId, eventId))

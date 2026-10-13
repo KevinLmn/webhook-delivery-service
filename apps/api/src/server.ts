@@ -26,7 +26,9 @@ export interface BuildAppOptions {
 export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInstance> {
   // Config: the injected one, otherwise loaded from environment variables.
   const baseConfig = opts.config ?? loadConfigFromEnv()
-  const config: AppConfig = opts.masterKey ? { ...baseConfig, masterKey: opts.masterKey } : baseConfig
+  const config: AppConfig = opts.masterKey
+    ? { ...baseConfig, masterKey: opts.masterKey }
+    : baseConfig
 
   const app = Fastify({ logger: opts.logger ?? { level: config.logLevel } })
 

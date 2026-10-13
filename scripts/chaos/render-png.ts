@@ -1,6 +1,6 @@
-import { writeFile, mkdir } from 'node:fs/promises'
-import path from 'node:path'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
+import path from 'node:path'
 import type { ChartConfiguration, ChartType } from 'chart.js'
 import type { Sample } from './collector'
 
@@ -15,7 +15,7 @@ const BREAKER_NUMERIC: Record<Sample['breakerState'], number> = {
   closed: 0,
   half_open: 1,
   open: 2,
-  unknown: 0
+  unknown: 0,
 }
 
 export interface RenderInput {
@@ -49,7 +49,7 @@ function installChartJsV4Shim(): void {
     loaded: true,
     exports: ChartAuto,
     children: [],
-    paths: []
+    paths: [],
   } as unknown as NodeJS.Require['cache'][string]
 }
 
@@ -85,7 +85,7 @@ export async function renderChaosPng(input: RenderInput): Promise<string> {
       yAxisID: 'y',
       barPercentage: 1.0,
       categoryPercentage: 1.0,
-      order: 99
+      order: 99,
     }
   })
 
@@ -103,7 +103,7 @@ export async function renderChaosPng(input: RenderInput): Promise<string> {
           backgroundColor: '#16a34a',
           tension: 0.1,
           yAxisID: 'y',
-          order: 1
+          order: 1,
         },
         {
           type: 'line',
@@ -113,7 +113,7 @@ export async function renderChaosPng(input: RenderInput): Promise<string> {
           backgroundColor: '#f59e0b',
           tension: 0.1,
           yAxisID: 'y',
-          order: 2
+          order: 2,
         },
         {
           type: 'line',
@@ -123,7 +123,7 @@ export async function renderChaosPng(input: RenderInput): Promise<string> {
           backgroundColor: '#dc2626',
           tension: 0.1,
           yAxisID: 'y',
-          order: 3
+          order: 3,
         },
         {
           type: 'line',
@@ -133,9 +133,9 @@ export async function renderChaosPng(input: RenderInput): Promise<string> {
           backgroundColor: '#2563eb',
           stepped: 'before',
           yAxisID: 'y2',
-          order: 4
-        }
-      ]
+          order: 4,
+        },
+      ],
     },
     options: {
       responsive: false,
@@ -143,15 +143,15 @@ export async function renderChaosPng(input: RenderInput): Promise<string> {
       plugins: {
         title: {
           display: true,
-          text: `Chaos demo — ${input.totalEvents} events, ${labels.length}s sampling`
+          text: `Chaos demo — ${input.totalEvents} events, ${labels.length}s sampling`,
         },
-        legend: { position: 'bottom' }
+        legend: { position: 'bottom' },
       },
       scales: {
         x: { title: { display: true, text: 'time (s)' } },
         y: {
           title: { display: true, text: 'events count' },
-          beginAtZero: true
+          beginAtZero: true,
         },
         y2: {
           position: 'right',
@@ -159,16 +159,16 @@ export async function renderChaosPng(input: RenderInput): Promise<string> {
           min: 0,
           max: 2,
           ticks: { stepSize: 1 },
-          grid: { drawOnChartArea: false }
-        }
-      }
-    }
+          grid: { drawOnChartArea: false },
+        },
+      },
+    },
   }
 
   const chart = new ChartJSNodeCanvas({
     width: 1200,
     height: 600,
-    backgroundColour: 'white'
+    backgroundColour: 'white',
   })
   const buffer = await chart.renderToBuffer(config, 'image/png')
   await writeFile(outPath, buffer)

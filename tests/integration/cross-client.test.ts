@@ -4,7 +4,7 @@ import {
   seedClient,
   seedEndpoint,
   startApp,
-  startFakeEndpoint
+  startFakeEndpoint,
 } from '@vitrine/test-helpers'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -16,7 +16,7 @@ describe('cross-client isolation', () => {
     fake = await startFakeEndpoint()
     app = await startApp({
       databaseUrl: process.env.DATABASE_URL!,
-      redisUrl: process.env.REDIS_URL!
+      redisUrl: process.env.REDIS_URL!,
     })
   })
 
@@ -31,7 +31,7 @@ describe('cross-client isolation', () => {
     const { endpointId: bEndpointId } = await seedEndpoint(app.db, {
       clientId: bId,
       url: fake.url,
-      masterKey: app.masterKey
+      masterKey: app.masterKey,
     })
 
     const r = await fetch(`${app.baseUrl}/events`, {
@@ -39,13 +39,13 @@ describe('cross-client isolation', () => {
       headers: {
         'content-type': 'application/json',
         authorization: `Bearer ${aKey}`,
-        'idempotency-key': 'cross-1'
+        'idempotency-key': 'cross-1',
       },
       body: JSON.stringify({
         endpoint_id: bEndpointId,
         event_type: 'order.shipped',
-        payload: { id: 1 }
-      })
+        payload: { id: 1 },
+      }),
     })
     expect(r.status).toBe(404)
     const body = (await r.json()) as { error: string }

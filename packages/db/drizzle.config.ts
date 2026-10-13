@@ -5,8 +5,8 @@ export default defineConfig({
   out: './drizzle',
   dialect: 'postgresql',
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/vitrine'
+    url: process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/vitrine',
   },
   verbose: true,
-  strict: true
+  strict: true,
 })

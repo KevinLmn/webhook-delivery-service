@@ -15,14 +15,14 @@ export const endpointsRoutes: FastifyPluginAsync = async (app) => {
       clientId: request.clientId,
       url: parsed.data.url,
       ...(parsed.data.description !== undefined ? { description: parsed.data.description } : {}),
-      masterKey: app.config.masterKey
+      masterKey: app.config.masterKey,
     })
     return reply.code(201).send({
       id: created.id,
       url: created.url,
       description: created.description,
       secret: created.secret,
-      created_at: created.createdAt
+      created_at: created.createdAt,
     })
   })
 
@@ -33,7 +33,7 @@ export const endpointsRoutes: FastifyPluginAsync = async (app) => {
       id: e.id,
       url: e.url,
       description: e.description,
-      created_at: e.createdAt
+      created_at: e.createdAt,
     }))
   })
 

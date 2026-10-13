@@ -26,9 +26,7 @@ export const clients = pgTable('clients', {
   id: text('id').primaryKey(), // ex: "cl_01H..."
   name: text('name').notNull(),
   apiKeyHash: text('api_key_hash').notNull().unique(), // HASH of the API key (never the plaintext key)
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
 // --- ENDPOINTS table: webhook destination URLs ---
@@ -43,9 +41,7 @@ export const endpoints = pgTable(
     secretEncrypted: bytea('secret_encrypted').notNull(), // HMAC secret ENCRYPTED at rest (AES-256-GCM)
     description: text('description'),
     archivedAt: timestamp('archived_at', { withTimezone: true }), // NULL = active; set = "soft delete"
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     // Soft delete via archived_at + partial index WHERE archived_at IS NULL
@@ -70,23 +66,14 @@ export const events = pgTable(
     status: text('status').notNull(), // 'pending' | 'delivered' | 'dead'
     deliveredAt: timestamp('delivered_at', { withTimezone: true }), // set when delivered
     deadAt: timestamp('dead_at', { withTimezone: true }), // set when given up
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     // COMPOSITE INDEX (3 columns): queries "an endpoint's events, filtered by
     // status, sorted by date". Order matters: endpointId (=), status (=), createdAt (sort).
-    statusIdx: index('events_endpoint_status_idx').on(
-      t.endpointId,
-      t.status,
-      t.createdAt,
-    ),
+    statusIdx: index('events_endpoint_status_idx').on(t.endpointId, t.status, t.createdAt),
     // CHECK CONSTRAINT: Postgres rejects any status outside these 3 values.
-    statusCheck: check(
-      'events_status_check',
-      sql`${t.status} IN ('pending','delivered','dead')`,
-    ),
+    statusCheck: check('events_status_check', sql`${t.status} IN ('pending','delivered','dead')`),
   }),
 )
 
@@ -99,9 +86,7 @@ export const deliveryAttempts = pgTable(
       .notNull()
       .references(() => events.id, { onDelete: 'cascade' }),
     attemptNumber: integer('attempt_number').notNull(), // 1, 2, 3... (attempt number)
-    attemptedAt: timestamp('attempted_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    attemptedAt: timestamp('attempted_at', { withTimezone: true }).notNull().defaultNow(),
     statusCode: integer('status_code'), // HTTP status received (NULL on network error)
     durationMs: integer('duration_ms').notNull(), // attempt duration
     errorClass: text('error_class'), // 'http_5xx' | 'timeout' | ... (NULL on success)
@@ -110,10 +95,7 @@ export const deliveryAttempts = pgTable(
   (t) => ({
     // UNIQUE INDEX: forbids two identical (event, attempt number) rows
     // → guarantees an attempt is never duplicated.
-    uniq: uniqueIndex('delivery_attempts_event_attempt_uniq').on(
-      t.eventId,
-      t.attemptNumber,
-    ),
+    uniq: uniqueIndex('delivery_attempts_event_attempt_uniq').on(t.eventId, t.attemptNumber),
   }),
 )
 

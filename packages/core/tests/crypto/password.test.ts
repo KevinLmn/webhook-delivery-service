@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { hashApiKey, verifyApiKey } from '../../src/crypto/password'
 
 describe('password (argon2id)', () => {

@@ -6,10 +6,10 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 
 export interface SignParams {
-  secret: string   // the secret shared with this client/endpoint
-  id: string       // the event ID (= webhook-id header)
+  secret: string // the secret shared with this client/endpoint
+  id: string // the event ID (= webhook-id header)
   timestamp: number // unix timestamp (= webhook-timestamp header)
-  body: string     // the exact JSON body sent
+  body: string // the exact JSON body sent
 }
 
 export interface VerifyParams extends SignParams {
@@ -40,7 +40,7 @@ export function verifyWebhookSignature(params: VerifyParams): boolean {
   let providedBuf: Buffer
   let expectedBuf: Buffer
   try {
-    providedBuf = Buffer.from(provided, 'base64')     // what the client sent
+    providedBuf = Buffer.from(provided, 'base64') // what the client sent
     expectedBuf = Buffer.from(compute(params), 'base64') // what we recompute
   } catch {
     return false

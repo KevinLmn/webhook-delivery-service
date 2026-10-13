@@ -4,7 +4,7 @@ export function createRedisClient(url: string, opts: Partial<RedisOptions> = {})
   const client = new Redis(url, {
     maxRetriesPerRequest: null, // BullMQ requirement
     enableReadyCheck: false,
-    ...opts
+    ...opts,
   })
   return client
 }

@@ -3,7 +3,7 @@
 //  Steps: check the endpoint → idempotency (SET NX) → insert → enqueue.
 // ============================================================================
 import { type StoredIdempotency, idempotencyDecide, newId, sha256Hex } from '@vitrine/core'
-import { type DbClient, events } from '@vitrine/db'
+import { events, type DbClient } from '@vitrine/db'
 import type { DeliveryJobData } from '@vitrine/queue'
 import type { Queue } from 'bullmq'
 import type { Redis } from 'ioredis'
@@ -12,9 +12,9 @@ import { findEndpointForClient } from './endpoints'
 const IDEM_TTL_SEC = 86_400 // the idempotency key lives 24h
 
 export type IngestionResult =
-  | { kind: 'created'; eventId: string }   // new event
-  | { kind: 'existing'; eventId: string }  // identical replay → same event
-  | { kind: 'conflict' }                   // same key, different payload
+  | { kind: 'created'; eventId: string } // new event
+  | { kind: 'existing'; eventId: string } // identical replay → same event
+  | { kind: 'conflict' } // same key, different payload
   | { kind: 'endpoint_not_found' }
 
 export async function ingestEvent(opts: {
@@ -57,7 +57,7 @@ export async function ingestEvent(opts: {
     endpointId: opts.endpointId,
     eventType: opts.eventType,
     payload: opts.payload as object,
-    status: 'pending'
+    status: 'pending',
   })
 
   // 5) Enqueue the job. jobId: eventId = BullMQ deduplication (one event =

@@ -1,13 +1,13 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { request } from 'undici'
+import { type Sample, sampleOnce } from './collector.ts'
 import { CHAOS_PHASES, startChaosFakeEndpoint } from './fake-endpoint.ts'
 import { bootChaosStack } from './orchestrator.ts'
-import { sampleOnce, type Sample } from './collector.ts'
 import { renderChaosPng } from './render-png.ts'
 
 const TOTAL_EVENTS = 100
-const PUSH_DURATION_MS = 90_000  // spread across all phases so traffic hits the outage
-const RUN_DURATION_MS = 140_000  // 110 s phases + 30 s drain
+const PUSH_DURATION_MS = 90_000 // spread across all phases so traffic hits the outage
+const RUN_DURATION_MS = 140_000 // 110 s phases + 30 s drain
 const SAMPLE_INTERVAL_MS = 1_000
 
 function fileStem(now: Date): string {
@@ -17,8 +17,10 @@ function fileStem(now: Date): string {
     pad(now.getMonth() + 1),
     pad(now.getDate()),
     pad(now.getHours()),
-    pad(now.getMinutes())
-  ].join('-').replace(/-(?=\d{2}$)/, '-')  // 2026-05-10-14-32
+    pad(now.getMinutes()),
+  ]
+    .join('-')
+    .replace(/-(?=\d{2}$)/, '-') // 2026-05-10-14-32
 }
 
 async function pushEvents(opts: {
@@ -36,15 +38,15 @@ async function pushEvents(opts: {
       const r = await request(`${opts.apiBaseUrl}/events`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${opts.apiKey}`,
+          Authorization: `Bearer ${opts.apiKey}`,
           'Idempotency-Key': `chaos-${i}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           endpoint_id: opts.endpointId,
           event_type: 'chaos.demo',
-          payload: { i, ts: Date.now() }
-        })
+          payload: { i, ts: Date.now() },
+        }),
       })
       await r.body.dump()
       if (r.statusCode !== 202 && r.statusCode !== 200) {
@@ -84,7 +86,7 @@ async function main() {
     apiKey: stack.apiKey,
     endpointId: stack.endpointId,
     total: TOTAL_EVENTS,
-    durationMs: PUSH_DURATION_MS
+    durationMs: PUSH_DURATION_MS,
   })
 
   // sample for the whole duration
@@ -96,14 +98,14 @@ async function main() {
       redis: stack.redis,
       endpointId: stack.endpointId,
       runStartedAt,
-      windowMs: 2_000
+      windowMs: 2_000,
     })
     samples.push(sample)
     log(
       `t=${(sample.tMs / 1000).toFixed(0).padStart(3, ' ')}s ` +
         `delivered=${sample.delivered} pending=${sample.pending} dead=${sample.dead} ` +
         `breaker=${sample.breakerState} skipCount=${sample.breakerSkipCount} ` +
-        `p50=${sample.p50LatencyMs ?? '—'}ms p99=${sample.p99LatencyMs ?? '—'}ms`
+        `p50=${sample.p50LatencyMs ?? '—'}ms p99=${sample.p99LatencyMs ?? '—'}ms`,
     )
     const sleepMs = Math.max(0, nextTick - Date.now())
     await sleep(sleepMs)
@@ -128,7 +130,7 @@ async function main() {
           ? 'rgba(34,197,94,0.08)'
           : p.behavior.kind === 'fail'
             ? 'rgba(220,38,38,0.08)'
-            : 'rgba(245,158,11,0.08)'
+            : 'rgba(245,158,11,0.08)',
     }
   })
 
@@ -138,7 +140,7 @@ async function main() {
     phases,
     totalEvents: TOTAL_EVENTS,
     outDir: 'docs/chaos-runs',
-    fileStem: stem
+    fileStem: stem,
   })
   log(`PNG written to ${pngPath}`)
 

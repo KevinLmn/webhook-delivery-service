@@ -1,4 +1,4 @@
-import { type DbClient, deliveryAttempts, events } from '@vitrine/db'
+import { events, type DbClient, deliveryAttempts } from '@vitrine/db'
 import { and, count, eq, gte } from 'drizzle-orm'
 import type { Redis } from 'ioredis'
 
@@ -55,10 +55,10 @@ export async function sampleOnce(opts: {
       .where(
         and(
           eq(events.endpointId, endpointId),
-          gte(deliveryAttempts.attemptedAt, new Date(now - windowMs))
-        )
+          gte(deliveryAttempts.attemptedAt, new Date(now - windowMs)),
+        ),
       )
-      .limit(500)
+      .limit(500),
   ])
 
   let delivered = 0
@@ -102,6 +102,6 @@ export async function sampleOnce(opts: {
     breakerSkipCount: skipCount,
     p50LatencyMs: percentile(sortedLatencies, 50),
     p99LatencyMs: percentile(sortedLatencies, 99),
-    totalAttempts: sortedLatencies.length
+    totalAttempts: sortedLatencies.length,
   }
 }

@@ -1,4 +1,4 @@
-import { createDbClient, type DbClient } from '@vitrine/db'
+import { type DbClient, createDbClient } from '@vitrine/db'
 import fp from 'fastify-plugin'
 
 declare module 'fastify' {

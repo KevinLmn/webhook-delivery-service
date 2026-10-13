@@ -1,9 +1,9 @@
+import { MAX_ATTEMPTS, backoffMs } from '@vitrine/core'
 // ============================================================================
 //  delivery-queue.ts — BullMQ QUEUE configuration (producer side).
 //  The API adds jobs here; the worker consumes them.
 // ============================================================================
-import { Queue, type ConnectionOptions, type WorkerOptions } from 'bullmq'
-import { backoffMs, MAX_ATTEMPTS } from '@vitrine/core'
+import { type ConnectionOptions, Queue, type WorkerOptions } from 'bullmq'
 
 export const QUEUE_NAME = 'webhook-deliveries'
 
@@ -18,11 +18,11 @@ export function createDeliveryQueue(connection: ConnectionOptions): Queue<Delive
   return new Queue<DeliveryJobData>(QUEUE_NAME, {
     connection,
     defaultJobOptions: {
-      attempts: MAX_ATTEMPTS,          // 7 attempts max (see the backoff schedule)
-      backoff: { type: 'custom' },     // use OUR delay strategy (below)
+      attempts: MAX_ATTEMPTS, // 7 attempts max (see the backoff schedule)
+      backoff: { type: 'custom' }, // use OUR delay strategy (below)
       removeOnComplete: { count: 1000 }, // keep the last 1000 completed jobs (the rest is purged)
-      removeOnFail: { count: 5000 }    // keep the last 5000 failed jobs
-    }
+      removeOnFail: { count: 5000 }, // keep the last 5000 failed jobs
+    },
   })
 }
 
@@ -36,7 +36,7 @@ export function workerSettings(): WorkerOptions['settings'] {
       // After attempt N fails, BullMQ asks for the delay before N+1.
       const nextAttempt = attemptsMade + 1
       if (nextAttempt > MAX_ATTEMPTS) return -1 // -1 = no more retries (give up)
-      return backoffMs(nextAttempt)             // our exponential delay + jitter
-    }
+      return backoffMs(nextAttempt) // our exponential delay + jitter
+    },
   }
 }

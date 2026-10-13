@@ -25,7 +25,7 @@ export const CHAOS_PHASES: PhaseConfig[] = [
   { startMs: 0, behavior: { kind: 'ok' } },
   { startMs: 10_000, behavior: { kind: 'fail', statusCode: 500 } },
   { startMs: 40_000, behavior: { kind: 'mixed', failRatio: 0.5, failStatusCode: 500 } },
-  { startMs: 80_000, behavior: { kind: 'ok' } }
+  { startMs: 80_000, behavior: { kind: 'ok' } },
 ]
 
 function activeBehavior(elapsedMs: number, phases: PhaseConfig[]): PhaseConfig['behavior'] {
@@ -87,6 +87,6 @@ export async function startChaosFakeEndpoint(opts: {
     },
     close: async () => {
       await app.close()
-    }
+    },
   }
 }

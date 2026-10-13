@@ -1,10 +1,10 @@
-import { spawnSync, spawn, type ChildProcess } from 'node:child_process'
+import { type ChildProcess, spawn, spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { request } from 'undici'
-import { createDbClient, type DbClient } from '@vitrine/db'
+import { type DbClient, createDbClient } from '@vitrine/db'
 import { seedClient, seedEndpoint } from '@vitrine/test-helpers'
 import IORedis, { type Redis } from 'ioredis'
+import { request } from 'undici'
 
 const COMPOSE_FILE = 'docker-compose.demo.yml'
 const HOST_API_PORT = 3001
@@ -30,7 +30,7 @@ export interface ChaosStack {
 function run(cmd: string, args: string[], env?: Record<string, string>) {
   const r = spawnSync(cmd, args, {
     stdio: 'inherit',
-    env: { ...process.env, ...env }
+    env: { ...process.env, ...env },
   })
   if (r.status !== 0) throw new Error(`${cmd} ${args.join(' ')} exited ${r.status}`)
 }
@@ -61,11 +61,9 @@ export async function bootChaosStack(opts: {
 
   // 1) build + up the stack (migrate runs as init via depends_on)
   run('docker', ['compose', '-f', COMPOSE_FILE, 'down', '-v'])
-  run(
-    'docker',
-    ['compose', '-f', COMPOSE_FILE, 'up', '-d', '--build'],
-    { MASTER_ENCRYPTION_KEY: masterKeyB64 }
-  )
+  run('docker', ['compose', '-f', COMPOSE_FILE, 'up', '-d', '--build'], {
+    MASTER_ENCRYPTION_KEY: masterKeyB64,
+  })
 
   const apiBaseUrl = `http://127.0.0.1:${HOST_API_PORT}`
   const databaseUrl = `postgres://postgres:postgres@127.0.0.1:${HOST_PG_PORT}/${DB_NAME}`
@@ -82,7 +80,7 @@ export async function bootChaosStack(opts: {
   const { endpointId, secret } = await seedEndpoint(db, {
     clientId,
     url: opts.endpointUrl,
-    masterKey
+    masterKey,
   })
 
   return {
@@ -105,6 +103,6 @@ export async function bootChaosStack(opts: {
       // postgres-js: no trivial close on the drizzle interface; tearing down
       // the compose stack is enough to free host-side network resources.
       run('docker', ['compose', '-f', COMPOSE_FILE, 'down', '-v'])
-    }
+    },
   }
 }

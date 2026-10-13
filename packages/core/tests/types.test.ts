@@ -1,5 +1,10 @@
-import { describe, it, expect } from 'vitest'
-import { CreateEndpointSchema, IngestEventSchema, EventTypeSchema, EndpointIdSchema } from '../src/types'
+import { describe, expect, it } from 'vitest'
+import {
+  CreateEndpointSchema,
+  EndpointIdSchema,
+  EventTypeSchema,
+  IngestEventSchema,
+} from '../src/types'
 
 describe('Zod schemas', () => {
   it('EventTypeSchema accepts order.shipped', () => {
@@ -15,7 +20,9 @@ describe('Zod schemas', () => {
   })
 
   it('EndpointIdSchema accepts a valid id', () => {
-    expect(EndpointIdSchema.parse('ep_01HZA1B2C3D4E5F6G7H8J9K0M1')).toBe('ep_01HZA1B2C3D4E5F6G7H8J9K0M1')
+    expect(EndpointIdSchema.parse('ep_01HZA1B2C3D4E5F6G7H8J9K0M1')).toBe(
+      'ep_01HZA1B2C3D4E5F6G7H8J9K0M1',
+    )
   })
 
   it('EndpointIdSchema rejects a different prefix', () => {
@@ -35,7 +42,7 @@ describe('Zod schemas', () => {
     const valid = {
       endpoint_id: 'ep_01HZA1B2C3D4E5F6G7H8J9K0M1',
       event_type: 'order.shipped',
-      payload: { id: 42 }
+      payload: { id: 42 },
     }
     expect(IngestEventSchema.parse(valid)).toEqual(valid)
   })

@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { transition, type BreakerState } from '../../src/breaker/fsm'
+import { describe, expect, it } from 'vitest'
+import { type BreakerState, transition } from '../../src/breaker/fsm'
 
 const NOW = 1_700_000_000_000
 const INITIAL_OPEN_MS = 30_000
@@ -9,21 +9,21 @@ const closed = (failCount: number): BreakerState => ({
   state: 'closed',
   openedAt: null,
   failCount,
-  openDurationMs: INITIAL_OPEN_MS
+  openDurationMs: INITIAL_OPEN_MS,
 })
 
 const open = (openDurationMs: number, openedAt = NOW): BreakerState => ({
   state: 'open',
   openedAt,
   failCount: 0,
-  openDurationMs
+  openDurationMs,
 })
 
 const halfOpen = (openDurationMs: number): BreakerState => ({
   state: 'half_open',
   openedAt: null,
   failCount: 0,
-  openDurationMs
+  openDurationMs,
 })
 
 describe('breaker FSM transition', () => {

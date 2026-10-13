@@ -13,7 +13,7 @@ const name = args[nameIdx + 1]!
 if (!process.env.DATABASE_URL) {
   console.error('error: DATABASE_URL env var is required')
   console.error(
-    'example: DATABASE_URL=postgres://postgres:postgres@localhost:5432/vitrine pnpm cli:create-client --name acme'
+    'example: DATABASE_URL=postgres://postgres:postgres@localhost:5432/vitrine pnpm cli:create-client --name acme',
   )
   process.exit(1)
 }

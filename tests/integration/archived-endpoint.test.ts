@@ -4,7 +4,7 @@ import {
   seedClient,
   seedEndpoint,
   startApp,
-  startFakeEndpoint
+  startFakeEndpoint,
 } from '@vitrine/test-helpers'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -16,7 +16,7 @@ describe('archived endpoint', () => {
     fake = await startFakeEndpoint()
     app = await startApp({
       databaseUrl: process.env.DATABASE_URL!,
-      redisUrl: process.env.REDIS_URL!
+      redisUrl: process.env.REDIS_URL!,
     })
   })
 
@@ -30,13 +30,13 @@ describe('archived endpoint', () => {
     const { endpointId } = await seedEndpoint(app.db, {
       clientId,
       url: fake.url,
-      masterKey: app.masterKey
+      masterKey: app.masterKey,
     })
 
     // Archive (soft-delete) the endpoint via the public DELETE route.
     const del = await fetch(`${app.baseUrl}/endpoints/${endpointId}`, {
       method: 'DELETE',
-      headers: { authorization: `Bearer ${apiKey}` }
+      headers: { authorization: `Bearer ${apiKey}` },
     })
     expect(del.status).toBe(204)
 
@@ -46,13 +46,13 @@ describe('archived endpoint', () => {
       headers: {
         'content-type': 'application/json',
         authorization: `Bearer ${apiKey}`,
-        'idempotency-key': 'archived-1'
+        'idempotency-key': 'archived-1',
       },
       body: JSON.stringify({
         endpoint_id: endpointId,
         event_type: 'order.shipped',
-        payload: { id: 1 }
-      })
+        payload: { id: 1 },
+      }),
     })
     expect(r.status).toBe(404)
     const body = (await r.json()) as { error: string }

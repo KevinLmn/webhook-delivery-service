@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { sha256Hex, idempotencyDecide } from '../src/idempotency'
+import { describe, expect, it } from 'vitest'
+import { idempotencyDecide, sha256Hex } from '../src/idempotency'
 
 describe('sha256Hex', () => {
   it('stable for the same input', () => {
@@ -21,8 +21,8 @@ describe('idempotencyDecide', () => {
     expect(
       idempotencyDecide({
         stored: { eventId: 'evt_x', payloadSha256: 'h1' },
-        incomingHash: 'h1'
-      })
+        incomingHash: 'h1',
+      }),
     ).toEqual({ kind: 'existing', eventId: 'evt_x' })
   })
 
@@ -30,8 +30,8 @@ describe('idempotencyDecide', () => {
     expect(
       idempotencyDecide({
         stored: { eventId: 'evt_x', payloadSha256: 'h1' },
-        incomingHash: 'h2'
-      })
+        incomingHash: 'h2',
+      }),
     ).toEqual({ kind: 'conflict' })
   })
 })

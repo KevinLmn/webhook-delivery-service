@@ -1,4 +1,4 @@
-import { createDeliveryQueue, createRedisClient, type DeliveryJobData } from '@vitrine/queue'
+import { type DeliveryJobData, createDeliveryQueue, createRedisClient } from '@vitrine/queue'
 import type { Queue } from 'bullmq'
 import fp from 'fastify-plugin'
 import type { Redis } from 'ioredis'

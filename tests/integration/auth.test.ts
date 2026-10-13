@@ -4,7 +4,7 @@ import {
   seedClient,
   seedEndpoint,
   startApp,
-  startFakeEndpoint
+  startFakeEndpoint,
 } from '@vitrine/test-helpers'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -16,7 +16,7 @@ describe('auth', () => {
     fake = await startFakeEndpoint()
     app = await startApp({
       databaseUrl: process.env.DATABASE_URL!,
-      redisUrl: process.env.REDIS_URL!
+      redisUrl: process.env.REDIS_URL!,
     })
   })
 
@@ -30,7 +30,7 @@ describe('auth', () => {
     const { endpointId } = await seedEndpoint(app.db, {
       clientId,
       url: fake.url,
-      masterKey: app.masterKey
+      masterKey: app.masterKey,
     })
 
     const r = await fetch(`${app.baseUrl}/events`, {
@@ -39,8 +39,8 @@ describe('auth', () => {
       body: JSON.stringify({
         endpoint_id: endpointId,
         event_type: 'order.shipped',
-        payload: { id: 1 }
-      })
+        payload: { id: 1 },
+      }),
     })
     expect(r.status).toBe(401)
   })
@@ -50,7 +50,7 @@ describe('auth', () => {
     const { endpointId } = await seedEndpoint(app.db, {
       clientId,
       url: fake.url,
-      masterKey: app.masterKey
+      masterKey: app.masterKey,
     })
 
     const r = await fetch(`${app.baseUrl}/events`, {
@@ -58,13 +58,13 @@ describe('auth', () => {
       headers: {
         'content-type': 'application/json',
         authorization: 'Bearer cl_secret_totally_random_invalid_token',
-        'idempotency-key': 'auth-2'
+        'idempotency-key': 'auth-2',
       },
       body: JSON.stringify({
         endpoint_id: endpointId,
         event_type: 'order.shipped',
-        payload: { id: 1 }
-      })
+        payload: { id: 1 },
+      }),
     })
     expect(r.status).toBe(401)
   })

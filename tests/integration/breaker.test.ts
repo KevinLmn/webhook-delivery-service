@@ -4,7 +4,7 @@ import {
   seedClient,
   seedEndpoint,
   startApp,
-  startFakeEndpoint
+  startFakeEndpoint,
 } from '@vitrine/test-helpers'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -16,7 +16,7 @@ describe('breaker opens after 5 consecutive failures', () => {
     fake = await startFakeEndpoint()
     app = await startApp({
       databaseUrl: process.env.DATABASE_URL!,
-      redisUrl: process.env.REDIS_URL!
+      redisUrl: process.env.REDIS_URL!,
     })
   })
 
@@ -30,7 +30,7 @@ describe('breaker opens after 5 consecutive failures', () => {
     const { endpointId } = await seedEndpoint(app.db, {
       clientId,
       url: fake.url,
-      masterKey: app.masterKey
+      masterKey: app.masterKey,
     })
     fake.setResponse({ kind: 'fail', statusCode: 503 })
 
@@ -42,13 +42,13 @@ describe('breaker opens after 5 consecutive failures', () => {
         headers: {
           'content-type': 'application/json',
           authorization: `Bearer ${apiKey}`,
-          'idempotency-key': `breaker-${i}`
+          'idempotency-key': `breaker-${i}`,
         },
         body: JSON.stringify({
           endpoint_id: endpointId,
           event_type: 'order.shipped',
-          payload: { i }
-        })
+          payload: { i },
+        }),
       })
     }
 
@@ -72,13 +72,13 @@ describe('breaker opens after 5 consecutive failures', () => {
       headers: {
         'content-type': 'application/json',
         authorization: `Bearer ${apiKey}`,
-        'idempotency-key': 'breaker-6'
+        'idempotency-key': 'breaker-6',
       },
       body: JSON.stringify({
         endpoint_id: endpointId,
         event_type: 'order.shipped',
-        payload: { i: 6 }
-      })
+        payload: { i: 6 },
+      }),
     })
 
     // The breaker_skip path floors the requeue delay at 1000ms in deliver.ts.
