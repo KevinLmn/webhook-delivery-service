@@ -67,7 +67,7 @@ jobs:
 
       # The key is a forced command on the server: whatever we ask, it runs deploy/deploy.sh.
       - name: Deploy
-        run: ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}"
+        run: ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes "${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}"
 
       - name: Public health check
         run: curl -fsS --retry 10 --retry-delay 3 --retry-all-errors https://webhook.kevinlemniai.fr/health
