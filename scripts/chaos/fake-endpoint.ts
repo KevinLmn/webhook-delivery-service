@@ -1,9 +1,9 @@
 import Fastify, { type FastifyInstance } from 'fastify'
 
 export interface PhaseConfig {
-  /** ms depuis startTime auquel cette phase prend effet */
+  /** ms since startTime at which this phase takes effect */
   startMs: number
-  /** Comportement de l'endpoint pendant cette phase */
+  /** Endpoint behavior during this phase */
   behavior:
     | { kind: 'ok' }
     | { kind: 'fail'; statusCode: number }
@@ -13,9 +13,9 @@ export interface PhaseConfig {
 export interface FakeEndpoint {
   url: string
   startedAt: number
-  /** Nombre cumulé de requêtes reçues */
+  /** Cumulative number of requests received */
   totalReceived: () => number
-  /** Phase active à un instant donné (pour annoter le PNG) */
+  /** Active phase at a given instant (to annotate the PNG) */
   phaseAt: (ms: number) => number
   close: () => Promise<void>
 }
@@ -61,14 +61,14 @@ export async function startChaosFakeEndpoint(opts: {
     return reply.code(200).send({ ok: true })
   })
 
-  // 0.0.0.0 pour être joignable depuis le conteneur worker via host.docker.internal
+  // 0.0.0.0 so it's reachable from the worker container via host.docker.internal
   await app.listen({ host: '0.0.0.0', port: opts.port ?? 0 })
   const address = app.server.address()
   if (!address || typeof address === 'string') throw new Error('listen failed')
 
-  // L'URL communiquée à l'API doit pointer vers le host depuis l'intérieur du worker
-  // Docker. Sur Docker Desktop (mac/win), `host.docker.internal` résout le host.
-  // Sur Linux, on passe par `--add-host=host.docker.internal:host-gateway` dans le compose.
+  // The URL given to the API must point to the host from inside the Docker
+  // worker. On Docker Desktop (mac/win), `host.docker.internal` resolves to the host.
+  // On Linux, we use `--add-host=host.docker.internal:host-gateway` in the compose file.
   const url = `http://host.docker.internal:${address.port}/hook`
 
   return {

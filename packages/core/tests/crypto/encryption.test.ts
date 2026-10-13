@@ -12,21 +12,21 @@ describe('encryption (AES-256-GCM)', () => {
     expect(decrypted).toBe(plaintext)
   })
 
-  it('produit un ciphertext différent à chaque appel (IV aléatoire)', () => {
+  it('produces a different ciphertext on each call (random IV)', () => {
     const plaintext = 'same_input'
     const c1 = encryptSecret(plaintext, masterKey)
     const c2 = encryptSecret(plaintext, masterKey)
     expect(Buffer.compare(c1, c2)).not.toBe(0)
   })
 
-  it('decrypt avec une mauvaise master key échoue', () => {
+  it('decrypt with a wrong master key fails', () => {
     const plaintext = 'secret'
     const ciphertext = encryptSecret(plaintext, masterKey)
     const wrongKey = randomBytes(32)
     expect(() => decryptSecret(ciphertext, wrongKey)).toThrow()
   })
 
-  it('decrypt avec un ciphertext altéré échoue (auth tag invalide)', () => {
+  it('decrypt with a tampered ciphertext fails (invalid auth tag)', () => {
     const ciphertext = encryptSecret('secret', masterKey)
     const lastIdx = ciphertext.length - 1
     const lastByte = ciphertext.readUInt8(lastIdx)
@@ -34,7 +34,7 @@ describe('encryption (AES-256-GCM)', () => {
     expect(() => decryptSecret(ciphertext, masterKey)).toThrow()
   })
 
-  it('rejette une master key qui ne fait pas 32 bytes', () => {
+  it('rejects a master key that is not 32 bytes', () => {
     expect(() => encryptSecret('x', randomBytes(16))).toThrow(/32 bytes/)
   })
 })

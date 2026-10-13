@@ -2,36 +2,36 @@ import { describe, it, expect } from 'vitest'
 import { CreateEndpointSchema, IngestEventSchema, EventTypeSchema, EndpointIdSchema } from '../src/types'
 
 describe('Zod schemas', () => {
-  it('EventTypeSchema accepte order.shipped', () => {
+  it('EventTypeSchema accepts order.shipped', () => {
     expect(EventTypeSchema.parse('order.shipped')).toBe('order.shipped')
   })
 
-  it('EventTypeSchema rejette MAJUSCULE', () => {
+  it('EventTypeSchema rejects UPPERCASE', () => {
     expect(() => EventTypeSchema.parse('Order.Shipped')).toThrow()
   })
 
-  it('EventTypeSchema rejette les espaces', () => {
+  it('EventTypeSchema rejects spaces', () => {
     expect(() => EventTypeSchema.parse('order shipped')).toThrow()
   })
 
-  it('EndpointIdSchema accepte un id valide', () => {
+  it('EndpointIdSchema accepts a valid id', () => {
     expect(EndpointIdSchema.parse('ep_01HZA1B2C3D4E5F6G7H8J9K0M1')).toBe('ep_01HZA1B2C3D4E5F6G7H8J9K0M1')
   })
 
-  it('EndpointIdSchema rejette préfixe différent', () => {
+  it('EndpointIdSchema rejects a different prefix', () => {
     expect(() => EndpointIdSchema.parse('cl_01HZA1B2C3D4E5F6G7H8J9K0M1')).toThrow()
   })
 
-  it('CreateEndpointSchema accepte url HTTPS', () => {
+  it('CreateEndpointSchema accepts an HTTPS url', () => {
     const result = CreateEndpointSchema.parse({ url: 'https://example.com/hook' })
     expect(result.url).toBe('https://example.com/hook')
   })
 
-  it('CreateEndpointSchema rejette url HTTP plain', () => {
+  it('CreateEndpointSchema rejects a plain HTTP url', () => {
     expect(() => CreateEndpointSchema.parse({ url: 'http://example.com/hook' })).toThrow(/https/)
   })
 
-  it('IngestEventSchema valide un payload complet', () => {
+  it('IngestEventSchema validates a complete payload', () => {
     const valid = {
       endpoint_id: 'ep_01HZA1B2C3D4E5F6G7H8J9K0M1',
       event_type: 'order.shipped',

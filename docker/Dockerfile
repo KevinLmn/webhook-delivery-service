@@ -29,5 +29,5 @@ COPY apps/ apps/
 COPY packages/ packages/
 COPY scripts/ scripts/
 EXPOSE 3000
-# Le CMD est surchargé par fly.toml [processes] (api/worker) et par docker-compose.demo.yml.
+# CMD is overridden by fly.toml [processes] (api/worker) and by docker-compose.demo.yml.
 CMD ["pnpm", "--filter", "@vitrine/api", "start"]

@@ -31,7 +31,7 @@ describe('classifyOutcome', () => {
       .toEqual<Outcome>({ kind: 'throttle', retryAfterRaw: '30' })
   })
 
-  it('429 sans Retry-After → throttle avec retryAfterRaw null', () => {
+  it('429 without Retry-After → throttle with retryAfterRaw null', () => {
     expect(classifyOutcome({ kind: 'response', statusCode: 429 }))
       .toEqual<Outcome>({ kind: 'throttle', retryAfterRaw: null })
   })

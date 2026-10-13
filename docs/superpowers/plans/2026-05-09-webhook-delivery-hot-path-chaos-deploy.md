@@ -2,98 +2,98 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Compléter les milestones M5 (chaos demo avec PNG narratif) et M6 (Dockerfile + Fly.io + GitHub Actions CI/CD + README final) du spec, à partir du service Node/TS local entièrement fonctionnel produit par Plan 1.
+**Goal:** Complete milestones M5 (chaos demo with narrative PNG) and M6 (Dockerfile + Fly.io + GitHub Actions CI/CD + final README) of the spec, starting from the fully working local Node/TS service produced by Plan 1.
 
-**Architecture:** Un script standalone `scripts/chaos/run.ts` qui orchestre une démo end-to-end (fake endpoint scénarisé en 4 phases, push de 100 events, sampling à 1 Hz, génération PNG via `chartjs-node-canvas`). Un Dockerfile multi-stage pour packager l'image partagée API+Worker. Un seul Fly app avec deux `[processes]` (api, worker) qui partagent l'image et les secrets. Un workflow GitHub Actions `ci.yml` pour typecheck + lint + unit + integration, un workflow `deploy.yml` pour `flyctl deploy` sur push to `main`.
+**Architecture:** A standalone script `scripts/chaos/run.ts` that orchestrates an end-to-end demo (fake endpoint scripted in 4 phases, push of 100 events, 1 Hz sampling, PNG generation via `chartjs-node-canvas`). A multi-stage Dockerfile to package the shared API+Worker image. A single Fly app with two `[processes]` (api, worker) sharing the image and secrets. A GitHub Actions workflow `ci.yml` for typecheck + lint + unit + integration, and a `deploy.yml` workflow for `flyctl deploy` on push to `main`.
 
 **Tech Stack:** Node.js 22 LTS, pnpm 9, `chartjs-node-canvas` 4.x, Docker (multi-stage Alpine), Fly.io (`flyctl`), GitHub Actions (`ubuntu-latest`, hosted Docker).
 
-**Prérequis Plan 2** : Plan 1 entièrement exécuté, suite `pnpm test:integration` verte localement, `pnpm dev` capable de servir un POST /events qui finit en `delivered`.
+**Plan 2 prerequisites**: Plan 1 fully executed, `pnpm test:integration` suite green locally, `pnpm dev` able to serve a POST /events that ends up `delivered`.
 
 ---
 
-## Spec de référence
+## Reference spec
 
-`docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md`. Les sections directement adressées par ce plan :
-- Section 1 — critère "déployé sur Fly.io accessible via URL publique" + "PNG chaos run le plus récent embedé".
-- Section 7.3 — chaos demo (script, scénario 4 phases, génération PNG).
+`docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md`. Sections directly addressed by this plan:
+- Section 1 — criterion "deployed on Fly.io, reachable via public URL" + "most recent chaos run PNG embedded".
+- Section 7.3 — chaos demo (script, 4-phase scenario, PNG generation).
 - Section 7.4 — CI (typecheck, lint, unit, integration).
-- Section 9 — déploiement (Fly.io + Neon + Upstash, Dockerfile multi-stage, secrets, release_command).
-- Annexe — `chartjs-node-canvas` ou alternative.
+- Section 9 — deployment (Fly.io + Neon + Upstash, multi-stage Dockerfile, secrets, release_command).
+- Appendix — `chartjs-node-canvas` or alternative.
 
-Toute incohérence entre ce plan et le spec se résout en faveur du spec.
+Any inconsistency between this plan and the spec is resolved in favor of the spec.
 
 ---
 
-## File structure cible (delta sur l'état Plan 1)
+## Target file structure (delta from Plan 1 state)
 
 ```
 vitrine/
 ├── scripts/
 │   └── chaos/
-│       ├── run.ts                  # entrée — pnpm demo:chaos
-│       ├── fake-endpoint.ts        # serveur Fastify scénarisé 4 phases
-│       ├── collector.ts            # sampling à 1 Hz (events stats + breaker + latency)
+│       ├── run.ts                  # entry — pnpm demo:chaos
+│       ├── fake-endpoint.ts        # Fastify server scripted in 4 phases
+│       ├── collector.ts            # 1 Hz sampling (events stats + breaker + latency)
 │       ├── render-png.ts           # chartjs-node-canvas → PNG
 │       └── orchestrator.ts         # spin compose, seed, run, teardown
 ├── docs/
 │   └── chaos-runs/
 │       ├── .gitkeep
-│       └── 2026-05-XX-HH-MM.png    # généré au premier run, puis committé
+│       └── 2026-05-XX-HH-MM.png    # generated on first run, then committed
 ├── docker/
-│   └── Dockerfile                  # multi-stage, image partagée API+Worker
-├── docker-compose.demo.yml         # Postgres + Redis + API + Worker (image buildée)
+│   └── Dockerfile                  # multi-stage, shared API+Worker image
+├── docker-compose.demo.yml         # Postgres + Redis + API + Worker (built image)
 ├── .dockerignore
-├── fly.toml                        # un seul app, processes api + worker
+├── fly.toml                        # single app, processes api + worker
 ├── .github/
 │   └── workflows/
 │       ├── ci.yml                  # typecheck + lint + unit + integration
 │       └── deploy.yml              # flyctl deploy on push main
-├── README.md                       # MAJ : badge CI, URL Fly, PNG embed
-└── package.json                    # MAJ : script demo:chaos, deps chartjs-node-canvas
+├── README.md                       # UPDATE: CI badge, Fly URL, PNG embed
+└── package.json                    # UPDATE: demo:chaos script, chartjs-node-canvas deps
 ```
 
-Les autres dossiers (`apps/`, `packages/`, `tests/`) restent inchangés sauf modifications ponctuelles documentées (ex : ajout d'un script `start` propre à chaque app).
+The other directories (`apps/`, `packages/`, `tests/`) stay unchanged except for documented one-off changes (e.g. adding a `start` script to each app).
 
 ---
 
-## Décisions verrouillées avant exécution
+## Decisions locked before execution
 
-| Sujet | Choix retenu | Raison |
+| Topic | Chosen option | Reason |
 |---|---|---|
-| Lib chart PNG | `chartjs-node-canvas` 4.x | Spec section 7.3, mainstream, rendu déterministe |
-| Topologie Fly | 1 app, 2 process groups (`api`, `worker`) | Simplifie secrets et CI/CD ; spec autorise |
-| Build images | Pas de tsup, on garde tsx en runtime | Évite refactor du build packages, image reste légère, vitesse start négligeable pour vitrine |
-| Migrations en prod | `pnpm --filter @vitrine/db push --force` en `release_command` Fly | Cohérent avec Testcontainers, pas de journal `__drizzle_migrations` |
-| Chaos infra | `docker-compose.demo.yml` qui build l'image (API+Worker) + Postgres + Redis | Spec section 7.3, isole le run de l'environnement dev |
-| Persistance Redis demo | `tmpfs` dans le compose | Reset garanti à chaque run |
-| Postgres demo | `tmpfs` également | Idem |
-| Sampling chaos | 1 Hz (1s tick) | Spec section 7.3 |
-| Push events | 100 sur 5 s = 20 events/s, throttlé via Promise queue de concurrence 10 | Évite saturer le port local |
-| Phases scénarisées | 0-10 s 200 OK ; 10-40 s 500 ; 40-80 s 50/50 ; 80-110 s 200 OK | Spec section 7.3 ; durée totale 110 s + 30 s drain |
-| Fenêtre de drain | 30 s après fin phase 4 | Couvre les retries 1 s + 10 s sans être trop long |
+| PNG chart lib | `chartjs-node-canvas` 4.x | Spec section 7.3, mainstream, deterministic rendering |
+| Fly topology | 1 app, 2 process groups (`api`, `worker`) | Simplifies secrets and CI/CD; allowed by spec |
+| Image build | No tsup, keep tsx at runtime | Avoids refactoring the packages build, image stays light, start speed negligible for a showcase |
+| Prod migrations | `pnpm --filter @vitrine/db push --force` as Fly `release_command` | Consistent with Testcontainers, no `__drizzle_migrations` journal |
+| Chaos infra | `docker-compose.demo.yml` that builds the image (API+Worker) + Postgres + Redis | Spec section 7.3, isolates the run from the dev environment |
+| Demo Redis persistence | `tmpfs` in the compose | Guaranteed reset on every run |
+| Demo Postgres | `tmpfs` as well | Same |
+| Chaos sampling | 1 Hz (1s tick) | Spec section 7.3 |
+| Push events | 100 over 5 s = 20 events/s, throttled via a Promise queue with concurrency 10 | Avoids saturating the local port |
+| Scripted phases | 0-10 s 200 OK; 10-40 s 500; 40-80 s 50/50; 80-110 s 200 OK | Spec section 7.3; total duration 110 s + 30 s drain |
+| Drain window | 30 s after end of phase 4 | Covers the 1 s + 10 s retries without being too long |
 
 ---
 
-## Phase A — Préparation des dépendances et arborescence
+## Phase A — Dependencies and directory tree setup
 
-### Task A.1 — Ajouter les dépendances chaos au workspace root
+### Task A.1 — Add chaos dependencies to the workspace root
 
 **Files:**
 - Modify: `package.json` (devDependencies + scripts)
 - Modify: `pnpm-lock.yaml` (auto)
 
-- [ ] **Step 1 : Ajouter `chartjs-node-canvas` et `chart.js` (peer) en devDependencies du root**
+- [ ] **Step 1: Add `chartjs-node-canvas` and `chart.js` (peer) to the root devDependencies**
 
-Edit `package.json`. Sous `devDependencies`, ajouter `"chartjs-node-canvas": "^4.1.6"` et `"chart.js": "^4.4.0"`. Ajouter aussi `"undici": "^6.20.0"` si pas déjà présent au root (utilisé par le chaos collector pour appeler l'API). Ajouter `"ioredis": "^5.4.0"` au root devDeps si absent (le chaos collector lit `breaker:*` directement). Ajouter `"@vitrine/db": "workspace:*"` au root devDeps si pas déjà présent.
+Edit `package.json`. Under `devDependencies`, add `"chartjs-node-canvas": "^4.1.6"` and `"chart.js": "^4.4.0"`. Also add `"undici": "^6.20.0"` if not already present at the root (used by the chaos collector to call the API). Add `"ioredis": "^5.4.0"` to the root devDeps if missing (the chaos collector reads `breaker:*` directly). Add `"@vitrine/db": "workspace:*"` to the root devDeps if not already present.
 
-Sous `scripts`, ajouter :
+Under `scripts`, add:
 
 ```json
 "demo:chaos": "tsx scripts/chaos/run.ts"
 ```
 
-État final attendu de la section `scripts` :
+Expected final state of the `scripts` section:
 
 ```json
 "scripts": {
@@ -112,29 +112,29 @@ Sous `scripts`, ajouter :
 }
 ```
 
-- [ ] **Step 2 : Installer**
+- [ ] **Step 2: Install**
 
-Run :
+Run:
 
 ```bash
 pnpm install
 ```
 
-Expected : pas d'erreur, `pnpm-lock.yaml` mis à jour, `node_modules/chartjs-node-canvas` présent.
+Expected: no error, `pnpm-lock.yaml` updated, `node_modules/chartjs-node-canvas` present.
 
-- [ ] **Step 3 : Vérifier que `chartjs-node-canvas` charge bien sur cette machine**
+- [ ] **Step 3: Check that `chartjs-node-canvas` loads correctly on this machine**
 
-Run :
+Run:
 
 ```bash
 node --input-type=module -e "import('chartjs-node-canvas').then(m => console.log(typeof m.ChartJSNodeCanvas))"
 ```
 
-Expected output : `function`.
+Expected output: `function`.
 
-Si l'import échoue avec une erreur native (cairo, pango), c'est que `node-canvas` n'a pas pu binder. Sur macOS : `brew install pkg-config cairo pango libpng jpeg giflib librsvg pixman`, puis `pnpm rebuild canvas`. Documenter dans le README la dépendance native si nécessaire.
+If the import fails with a native error (cairo, pango), `node-canvas` failed to bind. On macOS: `brew install pkg-config cairo pango libpng jpeg giflib librsvg pixman`, then `pnpm rebuild canvas`. Document the native dependency in the README if needed.
 
-- [ ] **Step 4 : Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add package.json pnpm-lock.yaml
@@ -143,28 +143,28 @@ git commit -m "chore: add chartjs-node-canvas and chaos script entry"
 
 ---
 
-### Task A.2 — Créer l'arborescence chaos vide + .gitkeep
+### Task A.2 — Create the empty chaos directory tree + .gitkeep
 
 **Files:**
-- Create: `scripts/chaos/.gitkeep` (placeholder, sera supprimé en A.3+)
+- Create: `scripts/chaos/.gitkeep` (placeholder, will be removed in A.3+)
 - Create: `docs/chaos-runs/.gitkeep`
 
-- [ ] **Step 1 : Créer les dossiers**
+- [ ] **Step 1: Create the directories**
 
 ```bash
 mkdir -p scripts/chaos docs/chaos-runs
 touch scripts/chaos/.gitkeep docs/chaos-runs/.gitkeep
 ```
 
-- [ ] **Step 2 : Vérifier**
+- [ ] **Step 2: Verify**
 
 ```bash
 ls scripts/chaos docs/chaos-runs
 ```
 
-Expected : `.gitkeep` dans les deux.
+Expected: `.gitkeep` in both.
 
-- [ ] **Step 3 : Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
 git add scripts/chaos/.gitkeep docs/chaos-runs/.gitkeep
@@ -173,25 +173,25 @@ git commit -m "chore: scaffold scripts/chaos and docs/chaos-runs directories"
 
 ---
 
-## Phase B — Chaos demo : fake endpoint scénarisé
+## Phase B — Chaos demo: scripted fake endpoint
 
-### Task B.1 — Implémenter `scripts/chaos/fake-endpoint.ts`
+### Task B.1 — Implement `scripts/chaos/fake-endpoint.ts`
 
-Le fake endpoint réutilise la même idée que `packages/test-helpers/src/fake-endpoint.ts` mais avec un scénario piloté par le temps écoulé depuis le démarrage. Pas mutualisé volontairement : le fake endpoint des tests est piloté manuellement (`setResponse`), celui du chaos suit une courbe automatique. DRY ne s'applique pas — boundaries différentes.
+The fake endpoint reuses the same idea as `packages/test-helpers/src/fake-endpoint.ts`, but with a scenario driven by the time elapsed since startup. Deliberately not shared: the test fake endpoint is driven manually (`setResponse`), the chaos one follows an automatic curve. DRY does not apply — different boundaries.
 
 **Files:**
 - Create: `scripts/chaos/fake-endpoint.ts`
-- Delete: `scripts/chaos/.gitkeep` (si présent)
+- Delete: `scripts/chaos/.gitkeep` (if present)
 
-- [ ] **Step 1 : Écrire le fichier**
+- [ ] **Step 1: Write the file**
 
 ```typescript
 import Fastify, { type FastifyInstance } from 'fastify'
 
 export interface PhaseConfig {
-  /** ms depuis startTime auquel cette phase prend effet */
+  /** ms since startTime at which this phase takes effect */
   startMs: number
-  /** Comportement de l'endpoint pendant cette phase */
+  /** Endpoint behavior during this phase */
   behavior:
     | { kind: 'ok' }
     | { kind: 'fail'; statusCode: number }
@@ -201,9 +201,9 @@ export interface PhaseConfig {
 export interface FakeEndpoint {
   url: string
   startedAt: number
-  /** Nombre cumulé de requêtes reçues */
+  /** Cumulative number of requests received */
   totalReceived: () => number
-  /** Phase active à un instant donné (pour annoter le PNG) */
+  /** Active phase at a given instant (to annotate the PNG) */
   phaseAt: (ms: number) => number
   close: () => Promise<void>
 }
@@ -249,14 +249,14 @@ export async function startChaosFakeEndpoint(opts: {
     return reply.code(200).send({ ok: true })
   })
 
-  // 0.0.0.0 pour être joignable depuis le conteneur worker via host.docker.internal
+  // 0.0.0.0 so it is reachable from the worker container via host.docker.internal
   await app.listen({ host: '0.0.0.0', port: opts.port ?? 0 })
   const address = app.server.address()
   if (!address || typeof address === 'string') throw new Error('listen failed')
 
-  // L'URL communiquée à l'API doit pointer vers le host depuis l'intérieur du worker
-  // Docker. Sur Docker Desktop (mac/win), `host.docker.internal` résout le host.
-  // Sur Linux, on passe par `--add-host=host.docker.internal:host-gateway` dans le compose.
+  // The URL given to the API must point to the host from inside the Docker
+  // worker. On Docker Desktop (mac/win), `host.docker.internal` resolves to the host.
+  // On Linux, we use `--add-host=host.docker.internal:host-gateway` in the compose.
   const url = `http://host.docker.internal:${address.port}/hook`
 
   return {
@@ -277,15 +277,15 @@ export async function startChaosFakeEndpoint(opts: {
 }
 ```
 
-- [ ] **Step 2 : Typecheck**
+- [ ] **Step 2: Typecheck**
 
 ```bash
 pnpm tsc --noEmit scripts/chaos/fake-endpoint.ts
 ```
 
-Expected : pas d'erreur. Si `Fastify`/`fastify` n'est pas en deps root, ajouter `"fastify": "^5.0.0"` dans `package.json` devDependencies puis `pnpm install`.
+Expected: no error. If `Fastify`/`fastify` is not in the root deps, add `"fastify": "^5.0.0"` to `package.json` devDependencies then `pnpm install`.
 
-- [ ] **Step 3 : Smoke test isolé**
+- [ ] **Step 3: Isolated smoke test**
 
 ```bash
 node --input-type=module -e "
@@ -300,7 +300,7 @@ await ep.close()
 " 2>&1 | tail -10
 ```
 
-Note : Node 22 sans tsx ne charge pas `.ts` directement. Préférer :
+Note: Node 22 without tsx does not load `.ts` directly. Prefer:
 
 ```bash
 pnpm tsx -e "
@@ -315,7 +315,7 @@ await ep.close()
 "
 ```
 
-Expected output (parmi les lignes) :
+Expected output (among the lines):
 
 ```
 url: http://host.docker.internal:<port>/hook
@@ -325,7 +325,7 @@ phase at 50000ms: 3
 phase at 90000ms: 4
 ```
 
-- [ ] **Step 4 : Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
 git rm scripts/chaos/.gitkeep 2>/dev/null || true
@@ -335,16 +335,16 @@ git commit -m "feat(chaos): add scenarised fake endpoint with 4-phase schedule"
 
 ---
 
-## Phase C — Chaos demo : compose stack et orchestration
+## Phase C — Chaos demo: compose stack and orchestration
 
-### Task C.1 — Créer `docker-compose.demo.yml`
+### Task C.1 — Create `docker-compose.demo.yml`
 
-L'objectif : un stack reproducible qui build l'image API+Worker, lance Postgres + Redis avec tmpfs (reset à chaque run), et exécute une migration `drizzle-kit push` au démarrage. Le stack expose le port 3000 sur `localhost` (où le chaos script tape) et résout `host.docker.internal` (où le fake endpoint écoute).
+Goal: a reproducible stack that builds the API+Worker image, starts Postgres + Redis with tmpfs (reset on every run), and runs a `drizzle-kit push` migration at startup. The stack exposes port 3000 on `localhost` (where the chaos script hits) and resolves `host.docker.internal` (where the fake endpoint listens).
 
 **Files:**
 - Create: `docker-compose.demo.yml`
 
-- [ ] **Step 1 : Écrire le fichier**
+- [ ] **Step 1: Write the file**
 
 ```yaml
 services:
@@ -362,7 +362,7 @@ services:
       timeout: 3s
       retries: 20
     ports:
-      - "5433:5432"  # éviter collision avec docker-compose.yml dev qui occupe 5432
+      - "5433:5432"  # avoid collision with the dev docker-compose.yml which uses 5432
 
   redis:
     image: redis:7-alpine
@@ -374,7 +374,7 @@ services:
       timeout: 3s
       retries: 20
     ports:
-      - "6380:6379"  # idem, éviter collision avec dev
+      - "6380:6379"  # same, avoid collision with dev
 
   migrate:
     build:
@@ -406,9 +406,9 @@ services:
       NODE_ENV: production
     command: ["pnpm", "--filter", "@vitrine/api", "start"]
     extra_hosts:
-      - "host.docker.internal:host-gateway"  # rendre le fake endpoint joignable sous Linux
+      - "host.docker.internal:host-gateway"  # make the fake endpoint reachable on Linux
     ports:
-      - "3001:3000"  # 3001 côté host pour éviter collision avec dev
+      - "3001:3000"  # 3001 on the host side to avoid collision with dev
 
   worker:
     build:
@@ -430,19 +430,19 @@ services:
       - "host.docker.internal:host-gateway"
 ```
 
-⚠️ Note : ce compose dépend de `docker/Dockerfile` qui n'existe pas encore (Task D.1). Le `docker compose build` échouera tant que le Dockerfile n'est pas écrit. C'est intentionnel — le compose et le Dockerfile sont une paire ; on les commit ensemble en Task D.1.
+⚠️ Note: this compose depends on `docker/Dockerfile`, which does not exist yet (Task D.1). `docker compose build` will fail until the Dockerfile is written. This is intentional — the compose and the Dockerfile are a pair; they get committed together in Task D.1.
 
-⚠️ Note : `MASTER_ENCRYPTION_KEY` doit être injecté par le shell qui lance `docker compose`. Le chaos script (Task C.4) le génère et le passe via `process.env`.
+⚠️ Note: `MASTER_ENCRYPTION_KEY` must be injected by the shell that runs `docker compose`. The chaos script (Task C.4) generates it and passes it via `process.env`.
 
-- [ ] **Step 2 : Vérifier la syntaxe YAML**
+- [ ] **Step 2: Check the YAML syntax**
 
 ```bash
 docker compose -f docker-compose.demo.yml config > /dev/null
 ```
 
-Expected : pas d'erreur (la résolution de `${MASTER_ENCRYPTION_KEY}` peut warn si non défini, c'est OK).
+Expected: no error (resolving `${MASTER_ENCRYPTION_KEY}` may warn if undefined, that's OK).
 
-- [ ] **Step 3 : Commit (sera buildable une fois D.1 commité)**
+- [ ] **Step 3: Commit (buildable once D.1 is committed)**
 
 ```bash
 git add docker-compose.demo.yml
@@ -451,14 +451,14 @@ git commit -m "feat(chaos): add demo compose stack (postgres+redis+api+worker)"
 
 ---
 
-### Task C.2 — Implémenter `scripts/chaos/collector.ts`
+### Task C.2 — Implement `scripts/chaos/collector.ts`
 
-Le collector lit l'état du système à chaque tick (1 Hz pendant la durée de la démo). Il compte les events par status, lit l'état du breaker depuis Redis, et calcule P50/P99 des `duration_ms` observés.
+The collector reads the system state on every tick (1 Hz for the duration of the demo). It counts events per status, reads the breaker state from Redis, and computes P50/P99 of the observed `duration_ms`.
 
 **Files:**
 - Create: `scripts/chaos/collector.ts`
 
-- [ ] **Step 1 : Écrire le fichier**
+- [ ] **Step 1: Write the file**
 
 ```typescript
 import { type DbClient, deliveryAttempts, events } from '@vitrine/db'
@@ -466,14 +466,14 @@ import { and, count, eq, gte } from 'drizzle-orm'
 import type { Redis } from 'ioredis'
 
 export interface Sample {
-  /** ms depuis le startedAt global du run */
+  /** ms since the run's global startedAt */
   tMs: number
   delivered: number
   pending: number
   dead: number
   breakerState: 'closed' | 'open' | 'half_open' | 'unknown'
   breakerSkipCount: number
-  /** P50 et P99 des duration_ms sur les attempts terminées dans la dernière fenêtre */
+  /** P50 and P99 of duration_ms over attempts completed in the last window */
   p50LatencyMs: number | null
   p99LatencyMs: number | null
   totalAttempts: number
@@ -537,8 +537,8 @@ export async function sampleOnce(opts: {
     try {
       const parsed = JSON.parse(breakerJson) as BreakerJson
       breakerState = parsed.state
-      // Lazy transition open → half_open : si l'expiration est dépassée à la lecture,
-      // on l'affiche comme half_open dans la viz (cohérent avec la logique runtime).
+      // Lazy transition open → half_open: if the expiry has passed at read time,
+      // display it as half_open in the viz (consistent with the runtime logic).
       if (
         parsed.state === 'open' &&
         parsed.opened_at !== null &&
@@ -569,18 +569,18 @@ export async function sampleOnce(opts: {
 }
 ```
 
-- [ ] **Step 2 : Typecheck**
+- [ ] **Step 2: Typecheck**
 
 ```bash
 pnpm tsx --tsconfig tsconfig.base.json scripts/chaos/collector.ts 2>&1 || true
 pnpm tsc --noEmit --project tsconfig.base.json scripts/chaos/collector.ts
 ```
 
-Expected : pas d'erreur de type.
+Expected: no type error.
 
-Si erreur "Cannot find module '@vitrine/db'", vérifier que le root `package.json` a bien `"@vitrine/db": "workspace:*"` en devDependencies (ajouté en A.1).
+If you get "Cannot find module '@vitrine/db'", check that the root `package.json` does have `"@vitrine/db": "workspace:*"` in devDependencies (added in A.1).
 
-- [ ] **Step 3 : Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
 git add scripts/chaos/collector.ts
@@ -589,14 +589,14 @@ git commit -m "feat(chaos): add 1Hz sample collector (status counts + breaker + 
 
 ---
 
-### Task C.3 — Implémenter `scripts/chaos/render-png.ts`
+### Task C.3 — Implement `scripts/chaos/render-png.ts`
 
-Génère un PNG annoté. X = temps en s. Y gauche = compteurs (delivered/pending/dead, lignes). Y droite = breaker state (step chart). Bandes verticales pour les phases. Le PNG est sauvé dans `docs/chaos-runs/`.
+Generates an annotated PNG. X = time in s. Left Y = counters (delivered/pending/dead, lines). Right Y = breaker state (step chart). Vertical bands for the phases. The PNG is saved to `docs/chaos-runs/`.
 
 **Files:**
 - Create: `scripts/chaos/render-png.ts`
 
-- [ ] **Step 1 : Écrire le fichier**
+- [ ] **Step 1: Write the file**
 
 ```typescript
 import { ChartJSNodeCanvas } from 'chartjs-node-canvas'
@@ -624,7 +624,7 @@ export interface RenderInput {
   phases: PhaseAnnotation[]
   totalEvents: number
   outDir: string
-  /** Préfixe nom de fichier, ex 2026-05-10-14-32 */
+  /** File name prefix, e.g. 2026-05-10-14-32 */
   fileStem: string
 }
 
@@ -638,9 +638,9 @@ export async function renderChaosPng(input: RenderInput): Promise<string> {
   const dead = input.samples.map((s) => s.dead)
   const breaker = input.samples.map((s) => BREAKER_NUMERIC[s.breakerState])
 
-  // chart.js plugin "annotation" est dans le namespace officiel mais pas inclus
-  // par défaut. Pour rester sans dépendance supplémentaire, on bake les bandes
-  // de phase via un dataset de type "bar" semi-transparent en arrière-plan.
+  // The chart.js "annotation" plugin is in the official namespace but not included
+  // by default. To avoid an extra dependency, we bake the phase bands
+  // in via a semi-transparent "bar" dataset in the background.
 
   const phaseBars = input.phases.map((p) => {
     const arr = labels.map((l) => {
@@ -748,17 +748,17 @@ export async function renderChaosPng(input: RenderInput): Promise<string> {
 }
 ```
 
-⚠️ Note : ce code ne dépend pas de `chartjs-plugin-annotation` (lib supplémentaire fragile sous Node). Les bandes de phase sont rendues via un dataset bar empilé semi-transparent en arrière-plan, ce qui rend le PNG auto-suffisant.
+⚠️ Note: this code does not depend on `chartjs-plugin-annotation` (an extra lib that is fragile under Node). Phase bands are rendered via a semi-transparent stacked bar dataset in the background, which makes the PNG self-contained.
 
-- [ ] **Step 2 : Typecheck**
+- [ ] **Step 2: Typecheck**
 
 ```bash
 pnpm tsc --noEmit --project tsconfig.base.json scripts/chaos/render-png.ts
 ```
 
-Expected : pas d'erreur. Si `Cannot find module 'chart.js'`, vérifier que la dep peer est bien installée (Task A.1).
+Expected: no error. If `Cannot find module 'chart.js'`, check that the peer dep is installed (Task A.1).
 
-- [ ] **Step 3 : Smoke test (PNG synthétique)**
+- [ ] **Step 3: Smoke test (synthetic PNG)**
 
 ```bash
 pnpm tsx -e "
@@ -790,15 +790,15 @@ console.log('written:', path)
 ls -lh docs/chaos-runs/smoke-render.png
 ```
 
-Expected : `written: docs/chaos-runs/smoke-render.png`, le fichier existe et fait > 5 KB.
+Expected: `written: docs/chaos-runs/smoke-render.png`, the file exists and is > 5 KB.
 
-- [ ] **Step 4 : Nettoyer le smoke**
+- [ ] **Step 4: Clean up the smoke output**
 
 ```bash
 rm docs/chaos-runs/smoke-render.png
 ```
 
-- [ ] **Step 5 : Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add scripts/chaos/render-png.ts
@@ -807,14 +807,14 @@ git commit -m "feat(chaos): render delivery + breaker timeline to PNG via chartj
 
 ---
 
-### Task C.4 — Implémenter `scripts/chaos/orchestrator.ts`
+### Task C.4 — Implement `scripts/chaos/orchestrator.ts`
 
-L'orchestrator gère le cycle de vie du stack docker-compose, seed un client + endpoint, et expose les handles dont a besoin le runner.
+The orchestrator manages the docker-compose stack lifecycle, seeds a client + endpoint, and exposes the handles the runner needs.
 
 **Files:**
 - Create: `scripts/chaos/orchestrator.ts`
 
-- [ ] **Step 1 : Écrire le fichier**
+- [ ] **Step 1: Write the file**
 
 ```typescript
 import { spawnSync, spawn, type ChildProcess } from 'node:child_process'
@@ -842,7 +842,7 @@ export interface ChaosStack {
   clientId: string
   endpointId: string
   endpointSecret: string
-  /** stop le compose et ferme les clients */
+  /** stops the compose and closes the clients */
   teardown: () => Promise<void>
 }
 
@@ -865,7 +865,7 @@ async function waitForApi(baseUrl: string, timeoutMs: number): Promise<void> {
       }
       await r.body.dump()
     } catch {
-      // pas encore prêt
+      // not ready yet
     }
     await sleep(1000)
   }
@@ -878,7 +878,7 @@ export async function bootChaosStack(opts: {
   const masterKey = randomBytes(32)
   const masterKeyB64 = masterKey.toString('base64')
 
-  // 1) build + up le stack (migrate s'exécute en init via depends_on)
+  // 1) build + up the stack (migrate runs as init via depends_on)
   run('docker', ['compose', '-f', COMPOSE_FILE, 'down', '-v'])
   run(
     'docker',
@@ -890,10 +890,10 @@ export async function bootChaosStack(opts: {
   const databaseUrl = `postgres://postgres:postgres@127.0.0.1:${HOST_PG_PORT}/${DB_NAME}`
   const redisUrl = `redis://127.0.0.1:${HOST_REDIS_PORT}`
 
-  // 2) attendre /ready
+  // 2) wait for /ready
   await waitForApi(apiBaseUrl, 60_000)
 
-  // 3) seed client + endpoint via les helpers du package test-helpers
+  // 3) seed client + endpoint via the test-helpers package helpers
   const db = createDbClient(databaseUrl)
   const redis = new IORedis(redisUrl, { maxRetriesPerRequest: null })
 
@@ -921,27 +921,27 @@ export async function bootChaosStack(opts: {
       } catch {
         // ignore
       }
-      // postgres-js : pas de close trivial sur l'interface drizzle ; le tear down
-      // du compose suffit à libérer les ressources réseau côté host.
+      // postgres-js: no trivial close on the drizzle interface; tearing down
+      // the compose is enough to free the network resources on the host side.
       run('docker', ['compose', '-f', COMPOSE_FILE, 'down', '-v'])
     }
   }
 }
 ```
 
-⚠️ Note : `seedClient` et `seedEndpoint` viennent de `@vitrine/test-helpers` (Plan 1, Task E.x). Ils insèrent directement en DB via Drizzle, ce qui est plus rapide que de passer par la CLI ou l'API publique. Acceptable ici car le chaos script est un outil de demo, pas un test de boundary publique.
+⚠️ Note: `seedClient` and `seedEndpoint` come from `@vitrine/test-helpers` (Plan 1, Task E.x). They insert directly into the DB via Drizzle, which is faster than going through the CLI or the public API. Acceptable here because the chaos script is a demo tool, not a public boundary test.
 
-⚠️ Note : `host.docker.internal` n'est pas standard sur Linux ; `extra_hosts: host.docker.internal:host-gateway` (ajouté en C.1) le résout vers la passerelle de l'hôte. Sur macOS, c'est natif via Docker Desktop.
+⚠️ Note: `host.docker.internal` is not standard on Linux; `extra_hosts: host.docker.internal:host-gateway` (added in C.1) resolves it to the host gateway. On macOS, it is native via Docker Desktop.
 
-- [ ] **Step 2 : Typecheck**
+- [ ] **Step 2: Typecheck**
 
 ```bash
 pnpm tsc --noEmit --project tsconfig.base.json scripts/chaos/orchestrator.ts
 ```
 
-Expected : pas d'erreur.
+Expected: no error.
 
-- [ ] **Step 3 : Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
 git add scripts/chaos/orchestrator.ts
@@ -950,14 +950,14 @@ git commit -m "feat(chaos): orchestrate compose lifecycle, seed client + endpoin
 
 ---
 
-### Task C.5 — Implémenter `scripts/chaos/run.ts` (entrée pnpm demo:chaos)
+### Task C.5 — Implement `scripts/chaos/run.ts` (pnpm demo:chaos entry)
 
-Le runner orchestre l'ensemble : démarre le fake endpoint, boote le stack, push 100 events sur 5 s, sample à 1 Hz pendant 140 s, génère le PNG, teardown.
+The runner orchestrates everything: starts the fake endpoint, boots the stack, pushes 100 events over 5 s, samples at 1 Hz for 140 s, generates the PNG, tears down.
 
 **Files:**
 - Create: `scripts/chaos/run.ts`
 
-- [ ] **Step 1 : Écrire le fichier**
+- [ ] **Step 1: Write the file**
 
 ```typescript
 import { setTimeout as sleep } from 'node:timers/promises'
@@ -1036,7 +1036,7 @@ async function main() {
   const runStartedAt = Date.now()
   const samples: Sample[] = []
 
-  // pousse les events dans la première fenêtre
+  // push the events in the first window
   log(`pushing ${TOTAL_EVENTS} events over ${PUSH_DURATION_MS}ms`)
   const pushPromise = pushEvents({
     apiBaseUrl: stack.apiBaseUrl,
@@ -1046,7 +1046,7 @@ async function main() {
     durationMs: PUSH_DURATION_MS
   })
 
-  // sample pendant toute la durée
+  // sample for the whole duration
   let nextTick = Date.now()
   while (Date.now() - runStartedAt < RUN_DURATION_MS) {
     nextTick += SAMPLE_INTERVAL_MS
@@ -1116,15 +1116,15 @@ main().catch((err) => {
 })
 ```
 
-- [ ] **Step 2 : Typecheck**
+- [ ] **Step 2: Typecheck**
 
 ```bash
 pnpm tsc --noEmit --project tsconfig.base.json scripts/chaos/run.ts
 ```
 
-Expected : pas d'erreur.
+Expected: no error.
 
-- [ ] **Step 3 : Commit (test full run en Task D.4 après Dockerfile)**
+- [ ] **Step 3: Commit (full run tested in Task D.4 after the Dockerfile)**
 
 ```bash
 git add scripts/chaos/run.ts
@@ -1133,28 +1133,28 @@ git commit -m "feat(chaos): orchestrate end-to-end chaos run with sampling and P
 
 ---
 
-## Phase D — Image Docker partagée API + Worker
+## Phase D — Shared API + Worker Docker image
 
-### Task D.1 — Écrire `docker/Dockerfile`
+### Task D.1 — Write `docker/Dockerfile`
 
-Image multi-stage : (1) deps-only avec pnpm fetch puis install, (2) runtime qui copie `node_modules` + le source. Pas de build TS — on utilise `tsx` au runtime via le script `start` (pragmatique pour un projet vitrine, évite le refactor packages → dist).
+Multi-stage image: (1) deps-only with pnpm fetch then install, (2) runtime that copies `node_modules` + the source. No TS build — we use `tsx` at runtime via the `start` script (pragmatic for a showcase project, avoids the packages → dist refactor).
 
 **Files:**
 - Create: `docker/Dockerfile`
 - Modify: `apps/api/package.json` (script `start`)
 - Modify: `apps/worker/package.json` (script `start`)
 
-- [ ] **Step 1 : Mettre à jour le script `start` de l'API**
+- [ ] **Step 1: Update the API `start` script**
 
-`apps/api/package.json` — remplacer la ligne `"start": "node dist/server.js"` par :
+`apps/api/package.json` — replace the line `"start": "node dist/server.js"` with:
 
 ```json
 "start": "tsx src/server.ts"
 ```
 
-Ajouter `"tsx": "^4.19.0"` dans `dependencies` (et non `devDependencies`) de `apps/api/package.json` pour qu'il soit installé en prod-mode.
+Add `"tsx": "^4.19.0"` to `dependencies` (not `devDependencies`) of `apps/api/package.json` so it is installed in prod mode.
 
-État final attendu pour `apps/api/package.json` :
+Expected final state for `apps/api/package.json`:
 
 ```json
 {
@@ -1187,15 +1187,15 @@ Ajouter `"tsx": "^4.19.0"` dans `dependencies` (et non `devDependencies`) de `ap
 }
 ```
 
-- [ ] **Step 2 : Idem pour le worker**
+- [ ] **Step 2: Same for the worker**
 
-`apps/worker/package.json` — remplacer `"start": "node dist/worker.js"` par `"start": "tsx src/worker.ts"`. Déplacer `tsx` de `devDependencies` vers `dependencies`.
+`apps/worker/package.json` — replace `"start": "node dist/worker.js"` with `"start": "tsx src/worker.ts"`. Move `tsx` from `devDependencies` to `dependencies`.
 
-- [ ] **Step 3 : Vérifier que `pnpm --filter @vitrine/api start` marche localement**
+- [ ] **Step 3: Check that `pnpm --filter @vitrine/api start` works locally**
 
 ```bash
 pnpm install
-docker compose up -d  # pour avoir Postgres + Redis sur ports 5432/6379
+docker compose up -d  # to get Postgres + Redis on ports 5432/6379
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/vitrine pnpm db:push
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/vitrine \
   REDIS_URL=redis://localhost:6379 \
@@ -1208,9 +1208,9 @@ kill $API_PID
 docker compose down
 ```
 
-Expected : `{"ok":true}`. Si erreur, reset et investiguer (souvent : env var manquante).
+Expected: `{"ok":true}`. If there's an error, reset and investigate (often: a missing env var).
 
-- [ ] **Step 4 : Écrire le Dockerfile**
+- [ ] **Step 4: Write the Dockerfile**
 
 ```dockerfile
 # syntax=docker/dockerfile:1.6
@@ -1244,17 +1244,17 @@ COPY apps/ apps/
 COPY packages/ packages/
 COPY scripts/ scripts/
 EXPOSE 3000
-# Le CMD est surchargé par fly.toml [processes] (api/worker) et par docker-compose.demo.yml.
+# CMD is overridden by fly.toml [processes] (api/worker) and by docker-compose.demo.yml.
 CMD ["pnpm", "--filter", "@vitrine/api", "start"]
 ```
 
-⚠️ Note : `pnpm install --prod=false` est volontaire. Drizzle-kit (utilisé par le `release_command` Fly et la migration Compose) est en `devDependencies` du package `db`. Vu la taille du projet, garder le full install est plus simple que de bricoler des `--prod` partiels avec une étape de rebuild côté workspace pnpm.
+⚠️ Note: `pnpm install --prod=false` is intentional. Drizzle-kit (used by the Fly `release_command` and the Compose migration) is in the `devDependencies` of the `db` package. Given the project's size, keeping the full install is simpler than hacking partial `--prod` installs with a rebuild step on the pnpm workspace side.
 
-⚠️ Note : `tsx` doit être visible depuis chaque app. Comme il est en `dependencies` de chaque app, le `pnpm --filter ... start` le résoudra via `node_modules/.bin/tsx`.
+⚠️ Note: `tsx` must be visible from each app. Since it is in each app's `dependencies`, `pnpm --filter ... start` will resolve it via `node_modules/.bin/tsx`.
 
-⚠️ Note : on copie `packages/test-helpers` aussi car le chaos demo (compose) `seedClient` y est défini. En prod réelle Fly, ce package n'est jamais chargé par l'API ou le Worker (pas d'import depuis `apps/`), donc son inclusion est sans impact runtime.
+⚠️ Note: we also copy `packages/test-helpers` because the chaos demo (compose) `seedClient` is defined there. In real Fly prod, this package is never loaded by the API or the Worker (no import from `apps/`), so including it has no runtime impact.
 
-- [ ] **Step 5 : Écrire `.dockerignore`**
+- [ ] **Step 5: Write `.dockerignore`**
 
 `/.dockerignore` :
 
@@ -1274,23 +1274,23 @@ coverage
 .DS_Store
 ```
 
-- [ ] **Step 6 : Build l'image**
+- [ ] **Step 6: Build the image**
 
 ```bash
 docker build -f docker/Dockerfile -t vitrine-webhook:dev .
 ```
 
-Expected : build réussi (peut prendre 1-3 min la première fois). Image taillée < 600 MB est acceptable.
+Expected: successful build (may take 1-3 min the first time). An image size < 600 MB is acceptable.
 
-- [ ] **Step 7 : Smoke run de l'image isolée**
+- [ ] **Step 7: Smoke run of the isolated image**
 
 ```bash
 docker run --rm vitrine-webhook:dev pnpm --filter @vitrine/api typecheck
 ```
 
-Expected : typecheck passe. Cela valide que l'image contient bien le source TS et que tsx peut le résoudre.
+Expected: typecheck passes. This confirms that the image does contain the TS source and that tsx can resolve it.
 
-- [ ] **Step 8 : Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add docker/Dockerfile .dockerignore apps/api/package.json apps/worker/package.json pnpm-lock.yaml
@@ -1299,11 +1299,11 @@ git commit -m "feat(docker): add multi-stage image, switch start to tsx runtime"
 
 ---
 
-### Task D.2 — Smoke run du compose demo (build + up + down)
+### Task D.2 — Smoke run of the demo compose (build + up + down)
 
-**Files:** aucun nouveau fichier.
+**Files:** no new file.
 
-- [ ] **Step 1 : Lancer le stack manuellement**
+- [ ] **Step 1: Start the stack manually**
 
 ```bash
 MASTER_ENCRYPTION_KEY=$(openssl rand -base64 32) \
@@ -1313,59 +1313,59 @@ docker compose -f docker-compose.demo.yml ps
 curl -s http://localhost:3001/ready
 ```
 
-Expected : `{"ok":true}` (ou un retry après quelques secondes si la DB n'est pas encore prête).
+Expected: `{"ok":true}` (or a retry after a few seconds if the DB is not ready yet).
 
-- [ ] **Step 2 : Vérifier les logs**
+- [ ] **Step 2: Check the logs**
 
 ```bash
 docker compose -f docker-compose.demo.yml logs api --tail 30
 docker compose -f docker-compose.demo.yml logs worker --tail 30
 ```
 
-Expected : API loggue qu'elle écoute sur 3000, worker loggue son boot. Pas de stack trace.
+Expected: API logs that it listens on 3000, worker logs its boot. No stack trace.
 
-- [ ] **Step 3 : Tear down**
+- [ ] **Step 3: Tear down**
 
 ```bash
 docker compose -f docker-compose.demo.yml down -v
 ```
 
-- [ ] **Step 4 : Pas de commit (validation runtime)**
+- [ ] **Step 4: No commit (runtime validation)**
 
 ---
 
-### Task D.3 — Run end-to-end de `pnpm demo:chaos`
+### Task D.3 — End-to-end run of `pnpm demo:chaos`
 
 **Files:**
-- Create (par run) : `docs/chaos-runs/YYYY-MM-DD-HH-MM.png`
+- Create (per run): `docs/chaos-runs/YYYY-MM-DD-HH-MM.png`
 
-- [ ] **Step 1 : Lancer**
+- [ ] **Step 1: Run**
 
 ```bash
 pnpm demo:chaos
 ```
 
-Le run prend ~2m30 (140 s sample window + ~30 s build/teardown). À la fin, le script imprime le path du PNG sur stdout.
+The run takes ~2m30 (140 s sample window + ~30 s build/teardown). At the end, the script prints the PNG path to stdout.
 
-- [ ] **Step 2 : Vérifier le PNG**
+- [ ] **Step 2: Check the PNG**
 
 ```bash
 ls -lh docs/chaos-runs/
 ```
 
-Expected : un PNG `YYYY-MM-DD-HH-MM.png` de taille > 30 KB. Ouvrir visuellement pour vérifier que les courbes sont cohérentes :
-- delivered grimpe rapidement en phase 1, plateau ou plateau lent en phase 2 (breaker open), reprise en phase 3, complétude en phase 4
-- breaker passe `closed → open → half_open → closed` quelque part entre 10 s et 80 s
+Expected: a PNG `YYYY-MM-DD-HH-MM.png` larger than 30 KB. Open it to visually check that the curves make sense:
+- delivered climbs quickly in phase 1, plateaus or rises slowly in phase 2 (breaker open), recovers in phase 3, completes in phase 4
+- breaker goes `closed → open → half_open → closed` somewhere between 10 s and 80 s
 
-Si la courbe est plate ou délivre 0 / 100, debug en lisant les logs `docker compose -f docker-compose.demo.yml logs worker` puis re-run.
+If the curve is flat or delivers 0 / 100, debug by reading the logs `docker compose -f docker-compose.demo.yml logs worker` then re-run.
 
-- [ ] **Step 3 : Garder ce premier PNG**
+- [ ] **Step 3: Keep this first PNG**
 
 ```bash
 git add docs/chaos-runs/*.png
 ```
 
-(Ne pas commit tout de suite ; on commit avec le README polish en Phase G qui le référence.)
+(Don't commit right away; we commit it with the README polish in Phase G, which references it.)
 
 ---
 
@@ -1376,7 +1376,7 @@ git add docs/chaos-runs/*.png
 **Files:**
 - Create: `.github/workflows/ci.yml`
 
-- [ ] **Step 1 : Écrire le fichier**
+- [ ] **Step 1: Write the file**
 
 ```yaml
 name: CI
@@ -1419,24 +1419,24 @@ jobs:
       - name: Integration tests (Testcontainers)
         run: pnpm test:integration
         env:
-          # Testcontainers détecte automatiquement le Docker daemon de runner.
-          # Ce flag réduit le bruit de logs en CI.
+          # Testcontainers automatically detects the runner's Docker daemon.
+          # This flag reduces log noise in CI.
           DEBUG: ''
 ```
 
-⚠️ Note : `ubuntu-latest` GitHub-hosted a Docker préinstallé, ce qui satisfait Testcontainers. Pas besoin d'un service `postgres:` au niveau workflow — Testcontainers spawn ses propres conteneurs.
+⚠️ Note: GitHub-hosted `ubuntu-latest` has Docker preinstalled, which satisfies Testcontainers. No need for a `postgres:` service at the workflow level — Testcontainers spawns its own containers.
 
-⚠️ Note : on n'inclut pas `pnpm demo:chaos` en CI (long, génère un PNG, conformément au spec section 7.4).
+⚠️ Note: we don't include `pnpm demo:chaos` in CI (long, generates a PNG, per spec section 7.4).
 
-- [ ] **Step 2 : Vérifier la syntaxe**
+- [ ] **Step 2: Check the syntax**
 
 ```bash
 cat .github/workflows/ci.yml | grep -E '^\s*(name|on|jobs|runs-on|steps):'
 ```
 
-Confirmation visuelle : structure cohérente avec un workflow GitHub Actions.
+Visual confirmation: structure consistent with a GitHub Actions workflow.
 
-- [ ] **Step 3 : Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
 mkdir -p .github/workflows
@@ -1444,32 +1444,32 @@ git add .github/workflows/ci.yml
 git commit -m "ci: add typecheck + lint + unit + integration workflow"
 ```
 
-- [ ] **Step 4 : Push une branche test pour valider**
+- [ ] **Step 4: Push a test branch to validate**
 
-Si la branche est déjà sur GitHub avec un remote `origin` configuré :
+If the branch is already on GitHub with an `origin` remote configured:
 
 ```bash
 git push origin HEAD
 ```
 
-Ensuite, observer sur l'interface GitHub Actions que le workflow passe vert. Si rouge, corriger localement et re-push.
+Then check in the GitHub Actions UI that the workflow goes green. If red, fix locally and re-push.
 
-Si le repo n'est pas encore sur GitHub : reporter cette validation à Task F.4.
+If the repo is not on GitHub yet: defer this validation to Task F.4.
 
 ---
 
 ## Phase F — Fly.io deploy + workflow CD
 
-### Task F.1 — Écrire `fly.toml` (1 app, 2 process groups)
+### Task F.1 — Write `fly.toml` (1 app, 2 process groups)
 
 **Files:**
 - Create: `fly.toml`
 
-- [ ] **Step 1 : Choisir un nom d'app**
+- [ ] **Step 1: Choose an app name**
 
-L'utilisateur doit choisir un nom unique sur Fly. Convention dans ce plan : `vitrine-webhook-demo`. Si l'utilisateur a déjà créé une autre app avec ce nom ou s'il préfère un autre, remplacer dans tout `fly.toml` et dans les workflows.
+The user must choose a unique name on Fly. Convention in this plan: `vitrine-webhook-demo`. If the user already created another app with this name or prefers a different one, replace it throughout `fly.toml` and in the workflows.
 
-- [ ] **Step 2 : Écrire le fichier**
+- [ ] **Step 2: Write the file**
 
 ```toml
 app = "vitrine-webhook-demo"
@@ -1525,11 +1525,11 @@ primary_region = "cdg"
   memory = "512mb"
 ```
 
-⚠️ Note : `release_command` tourne dans une éphémère VM avec accès aux secrets — `DATABASE_URL` doit donc être set avant le premier deploy (Task F.2). Drizzle-kit lit `DATABASE_URL` automatiquement via `drizzle.config.ts`.
+⚠️ Note: `release_command` runs in an ephemeral VM with access to the secrets — so `DATABASE_URL` must be set before the first deploy (Task F.2). Drizzle-kit reads `DATABASE_URL` automatically via `drizzle.config.ts`.
 
-⚠️ Note : la convention Fly veut que `[[services]]` soit attaché au process group `api` uniquement (le worker n'a pas de port HTTP exposé).
+⚠️ Note: Fly convention is for `[[services]]` to be attached to the `api` process group only (the worker has no exposed HTTP port).
 
-- [ ] **Step 3 : Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
 git add fly.toml
@@ -1538,40 +1538,40 @@ git commit -m "feat(fly): single app with api + worker process groups"
 
 ---
 
-### Task F.2 — Provisionner manuellement Fly + Neon + Upstash (étapes utilisateur)
+### Task F.2 — Manually provision Fly + Neon + Upstash (user steps)
 
-⚠️ **Cette task est manuelle et ne produit pas de commit dans le repo.** Le plan documente la procédure pour qu'un opérateur la rejoue sans surprise.
+⚠️ **This task is manual and produces no commit in the repo.** The plan documents the procedure so an operator can replay it without surprises.
 
-- [ ] **Step 1 : Installer flyctl si nécessaire**
+- [ ] **Step 1: Install flyctl if needed**
 
 ```bash
 brew install flyctl
 flyctl auth login
 ```
 
-- [ ] **Step 2 : Créer un projet Neon (Postgres)**
+- [ ] **Step 2: Create a Neon project (Postgres)**
 
-1. https://console.neon.tech → New project, region `eu-central-1` (Frankfurt) ou la plus proche de Paris.
-2. Nom suggéré : `vitrine-webhook`.
-3. Récupérer la `DATABASE_URL` Neon (avec `?sslmode=require`).
+1. https://console.neon.tech → New project, region `eu-central-1` (Frankfurt) or the one closest to Paris.
+2. Suggested name: `vitrine-webhook`.
+3. Grab the Neon `DATABASE_URL` (with `?sslmode=require`).
 
-- [ ] **Step 3 : Créer un Upstash Redis**
+- [ ] **Step 3: Create an Upstash Redis**
 
-1. https://console.upstash.com → New database, region `eu-west-1` ou proche.
-2. Cocher "TLS" (URL `rediss://`).
-3. Récupérer la `REDIS_URL`.
+1. https://console.upstash.com → New database, region `eu-west-1` or nearby.
+2. Check "TLS" (`rediss://` URL).
+3. Grab the `REDIS_URL`.
 
-⚠️ Note : `ioredis` doit accepter le `rediss://` pour TLS. Vérifier dans `packages/queue/src/redis.ts` que la factory ne réécrit pas le protocole. Si un test révèle un souci TLS Upstash spécifique, ajouter `tls: {}` dans les options ioredis.
+⚠️ Note: `ioredis` must accept `rediss://` for TLS. Check in `packages/queue/src/redis.ts` that the factory does not rewrite the protocol. If a test reveals an Upstash-specific TLS issue, add `tls: {}` to the ioredis options.
 
-- [ ] **Step 4 : Créer l'app Fly**
+- [ ] **Step 4: Create the Fly app**
 
 ```bash
 flyctl apps create vitrine-webhook-demo --org personal
 ```
 
-(Adapter `--org` au nom d'organisation Fly réel de l'utilisateur.)
+(Adjust `--org` to the user's actual Fly organization name.)
 
-- [ ] **Step 5 : Set secrets**
+- [ ] **Step 5: Set secrets**
 
 ```bash
 flyctl secrets set \
@@ -1581,17 +1581,17 @@ flyctl secrets set \
   --app vitrine-webhook-demo
 ```
 
-⚠️ Note : `MASTER_ENCRYPTION_KEY` est généré une seule fois. Si on le perd ou qu'on le rotate, tous les `secret_encrypted` existants en DB deviennent indéchiffrables (le worker fail). Conserver une copie privée hors-repo.
+⚠️ Note: `MASTER_ENCRYPTION_KEY` is generated only once. If it is lost or rotated, all existing `secret_encrypted` values in the DB become undecryptable (the worker fails). Keep a private copy outside the repo.
 
-- [ ] **Step 6 : Premier deploy manuel pour valider**
+- [ ] **Step 6: First manual deploy to validate**
 
 ```bash
 flyctl deploy --app vitrine-webhook-demo
 ```
 
-Expected : build, push, release_command exécute le push Drizzle, puis l'API démarre. À la fin, `flyctl status` doit montrer `api` et `worker` en `running`.
+Expected: build, push, release_command runs the Drizzle push, then the API starts. At the end, `flyctl status` should show `api` and `worker` as `running`.
 
-- [ ] **Step 7 : Vérifier l'URL publique**
+- [ ] **Step 7: Check the public URL**
 
 ```bash
 flyctl apps list
@@ -1600,20 +1600,20 @@ APP_URL=https://vitrine-webhook-demo.fly.dev
 curl -s "$APP_URL/ready"
 ```
 
-Expected : `{"ok":true}`.
+Expected: `{"ok":true}`.
 
-- [ ] **Step 8 : Créer un client réel et pousser un event smoke**
+- [ ] **Step 8: Create a real client and push a smoke event**
 
 ```bash
-# Connecter à Postgres Neon directement pour seed
+# Connect to Neon Postgres directly to seed
 DATABASE_URL="<neon_url>" pnpm cli:create-client --name fly-smoke
-# → noter cl_secret_xxx
+# → note cl_secret_xxx
 
 curl -s -X POST "$APP_URL/endpoints" \
   -H "Authorization: Bearer cl_secret_xxx" \
   -H "Content-Type: application/json" \
   -d '{"url":"https://httpbin.org/post"}'
-# → noter ep_xxx + secret
+# → note ep_xxx + secret
 
 curl -s -X POST "$APP_URL/events" \
   -H "Authorization: Bearer cl_secret_xxx" \
@@ -1626,20 +1626,20 @@ curl -s "$APP_URL/events/evt_xxx" -H "Authorization: Bearer cl_secret_xxx"
 # → status: "delivered"
 ```
 
-Expected : `delivered`. Si `pending`, debug via `flyctl logs --app vitrine-webhook-demo` et fixer.
+Expected: `delivered`. If `pending`, debug via `flyctl logs --app vitrine-webhook-demo` and fix.
 
-- [ ] **Step 9 : Noter l'URL publique pour le README**
+- [ ] **Step 9: Note the public URL for the README**
 
-Stocker `https://vitrine-webhook-demo.fly.dev` (ou variante) dans une note locale ; sera embarqué dans le README à la Phase G.
+Store `https://vitrine-webhook-demo.fly.dev` (or variant) in a local note; it will be embedded in the README in Phase G.
 
 ---
 
-### Task F.3 — Workflow `deploy.yml` (CD sur push main)
+### Task F.3 — `deploy.yml` workflow (CD on push to main)
 
 **Files:**
 - Create: `.github/workflows/deploy.yml`
 
-- [ ] **Step 1 : Écrire le fichier**
+- [ ] **Step 1: Write the file**
 
 ```yaml
 name: Deploy
@@ -1665,19 +1665,19 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 ```
 
-⚠️ Note : `--remote-only` délègue le build à Fly's builder (évite de payer le build en GitHub Actions). `concurrency.cancel-in-progress: false` empêche d'annuler un deploy en cours si un nouveau commit arrive (préserve la durabilité du release_command).
+⚠️ Note: `--remote-only` delegates the build to Fly's builder (avoids paying for the build in GitHub Actions). `concurrency.cancel-in-progress: false` prevents cancelling an in-progress deploy when a new commit arrives (preserves release_command durability).
 
-- [ ] **Step 2 : Provisionner le secret GitHub**
+- [ ] **Step 2: Provision the GitHub secret**
 
-Manuel : sur GitHub → repo Settings → Secrets and variables → Actions → New repository secret → `FLY_API_TOKEN` = sortie de `flyctl auth token`.
+Manual: on GitHub → repo Settings → Secrets and variables → Actions → New repository secret → `FLY_API_TOKEN` = output of `flyctl auth token`.
 
 ```bash
 flyctl auth token
 ```
 
-Copier la valeur, la coller dans GitHub Secrets.
+Copy the value and paste it into GitHub Secrets.
 
-- [ ] **Step 3 : Commit + push pour déclencher**
+- [ ] **Step 3: Commit + push to trigger**
 
 ```bash
 git add .github/workflows/deploy.yml
@@ -1685,7 +1685,7 @@ git commit -m "ci: add Fly deploy workflow on push to main"
 git push origin HEAD
 ```
 
-Observer dans GitHub Actions que `Deploy` tourne et finit vert. Vérifier dans Fly que la version a bien été incrémentée :
+Check in GitHub Actions that `Deploy` runs and finishes green. Check in Fly that the version was incremented:
 
 ```bash
 flyctl status --app vitrine-webhook-demo
@@ -1693,11 +1693,11 @@ flyctl status --app vitrine-webhook-demo
 
 ---
 
-### Task F.4 — Activer la branch protection et valider le flow CI complet
+### Task F.4 — Enable branch protection and validate the full CI flow
 
-⚠️ Manuel, pas de commit.
+⚠️ Manual, no commit.
 
-- [ ] **Step 1 : Créer une PR factice**
+- [ ] **Step 1: Create a dummy PR**
 
 ```bash
 git checkout -b ci-smoke
@@ -1707,15 +1707,15 @@ git push origin ci-smoke
 gh pr create --title "ci: smoke" --body "Trigger CI workflows" --base main --head ci-smoke
 ```
 
-- [ ] **Step 2 : Observer**
+- [ ] **Step 2: Observe**
 
-Le workflow `CI` doit tourner sur la PR. Vérifier que les 4 steps (typecheck, lint, unit, integration) passent.
+The `CI` workflow should run on the PR. Check that the 4 steps (typecheck, lint, unit, integration) pass.
 
-- [ ] **Step 3 : Merger**
+- [ ] **Step 3: Merge**
 
-Si vert, merge la PR. Le workflow `Deploy` doit alors se déclencher et redeploy Fly.
+If green, merge the PR. The `Deploy` workflow should then trigger and redeploy Fly.
 
-- [ ] **Step 4 : Cleanup**
+- [ ] **Step 4: Cleanup**
 
 ```bash
 git checkout main
@@ -1727,83 +1727,83 @@ git branch -D ci-smoke
 
 ## Phase G — README polish + chaos PNG embed
 
-### Task G.1 — Ajouter section déploiement + lien live + badge CI
+### Task G.1 — Add deployment section + live link + CI badge
 
 **Files:**
 - Modify: `README.md`
 
-- [ ] **Step 1 : Lire le README existant pour caler les modifications**
+- [ ] **Step 1: Read the existing README to align the changes**
 
 ```bash
 cat README.md
 ```
 
-- [ ] **Step 2 : Modifier le top du README pour ajouter le badge et l'URL live**
+- [ ] **Step 2: Edit the top of the README to add the badge and the live URL**
 
-Remplacer le bloc d'introduction (les premières lignes du README) par :
+Replace the intro block (the first lines of the README) with:
 
 ```markdown
 # Webhook Delivery Service
 
 [![CI](https://github.com/<USER>/<REPO>/actions/workflows/ci.yml/badge.svg)](https://github.com/<USER>/<REPO>/actions/workflows/ci.yml)
 
-Service Node/TypeScript qui ingère des événements via une API HTTP et les livre à des endpoints clients tiers, avec retry exponentiel, circuit breaker, idempotency keys et replay manuel. Modèle d'API aligné sur [Standard Webhooks](https://www.standardwebhooks.com).
+Node/TypeScript service that ingests events via an HTTP API and delivers them to third-party client endpoints, with exponential retry, circuit breaker, idempotency keys and manual replay. API model aligned with [Standard Webhooks](https://www.standardwebhooks.com).
 
-> Projet vitrine. Pas un service de production utilisé par de vrais clients.
+> Showcase project. Not a production service used by real customers.
 
-**Live demo** : https://vitrine-webhook-demo.fly.dev/ready (Fly.io single region `cdg` + Neon Postgres + Upstash Redis).
+**Live demo**: https://vitrine-webhook-demo.fly.dev/ready (Fly.io single region `cdg` + Neon Postgres + Upstash Redis).
 ```
 
-⚠️ Substituer `<USER>` et `<REPO>` par les valeurs réelles GitHub. Substituer l'URL Fly réelle si différente.
+⚠️ Replace `<USER>` and `<REPO>` with the actual GitHub values. Replace the Fly URL with the real one if different.
 
-- [ ] **Step 3 : Ajouter une section "Chaos demo" après "Tests"**
+- [ ] **Step 3: Add a "Chaos demo" section after "Tests"**
 
-Identifier la ligne du dernier `## Tests` et insérer après :
+Find the line of the last `## Tests` and insert after it:
 
 ```markdown
 ## Chaos demo
 
-Le script `pnpm demo:chaos` orchestre une démo end-to-end qui :
+The `pnpm demo:chaos` script orchestrates an end-to-end demo that:
 
-1. spawn un fake endpoint local scénarisé en 4 phases (200 OK → 500 → 50/50 → 200 OK) ;
-2. boote un stack Postgres + Redis + API + Worker via `docker-compose.demo.yml` ;
-3. push 100 events sur 5 s, sample l'état du système à 1 Hz pendant ~140 s ;
-4. génère un PNG annoté dans `docs/chaos-runs/`.
+1. spawns a local fake endpoint scripted in 4 phases (200 OK → 500 → 50/50 → 200 OK);
+2. boots a Postgres + Redis + API + Worker stack via `docker-compose.demo.yml`;
+3. pushes 100 events over 5 s, samples the system state at 1 Hz for ~140 s;
+4. generates an annotated PNG in `docs/chaos-runs/`.
 
 ```bash
 pnpm demo:chaos
 ```
 
-Le run prend ~3 min. Le PNG illustre la mécanique du circuit breaker : ouverture pendant la phase de panne, transition `half_open` après le cooldown, retour à `closed` à la reprise.
+The run takes ~3 min. The PNG illustrates the circuit breaker mechanics: opening during the outage phase, `half_open` transition after the cooldown, back to `closed` on recovery.
 
-### Dernier run
+### Latest run
 
 ![Latest chaos run](docs/chaos-runs/<FILE_STEM>.png)
 ```
 
-⚠️ Substituer `<FILE_STEM>` par le nom de fichier (sans extension) du PNG produit en Task D.3, par exemple `2026-05-10-14-32`.
+⚠️ Replace `<FILE_STEM>` with the file name (without extension) of the PNG produced in Task D.3, for example `2026-05-10-14-32`.
 
-- [ ] **Step 4 : Ajouter une section "Déploiement"**
+- [ ] **Step 4: Add a "Deployment" section**
 
-Avant la section `## Plan d'implémentation`, insérer :
+Before the `## Implementation plan` section, insert:
 
 ```markdown
-## Déploiement
+## Deployment
 
-Image Docker multi-stage (`docker/Dockerfile`) commune à l'API et au Worker. Topologie Fly : un seul app avec deux process groups (`api` exposé HTTP, `worker` background).
+Multi-stage Docker image (`docker/Dockerfile`) shared by the API and the Worker. Fly topology: a single app with two process groups (`api` exposed over HTTP, `worker` in the background).
 
 ```bash
 flyctl deploy --app vitrine-webhook-demo
 ```
 
-Migrations Drizzle exécutées automatiquement avant chaque release via `release_command` dans `fly.toml`. Secrets gérés par `flyctl secrets set` (`DATABASE_URL`, `REDIS_URL`, `MASTER_ENCRYPTION_KEY`).
+Drizzle migrations run automatically before each release via `release_command` in `fly.toml`. Secrets managed with `flyctl secrets set` (`DATABASE_URL`, `REDIS_URL`, `MASTER_ENCRYPTION_KEY`).
 
-CD configurée : push to `main` déclenche `.github/workflows/deploy.yml` qui appelle `flyctl deploy --remote-only`.
+CD configured: push to `main` triggers `.github/workflows/deploy.yml`, which calls `flyctl deploy --remote-only`.
 ```
 
-- [ ] **Step 5 : Mettre à jour la structure repo en bas du README**
+- [ ] **Step 5: Update the repo structure at the bottom of the README**
 
-Dans la section `## Structure du repo`, ajouter les nouveaux dossiers :
+In the `## Repo structure` section, add the new directories:
 
 ```markdown
 apps/
@@ -1815,27 +1815,27 @@ packages/
   queue/                      # BullMQ wrapper, Redis Lua scripts
   test-helpers/               # containers, app fixture, seed helpers
 scripts/
-  cli/                        # CLI utilitaires (create-client)
+  cli/                        # utility CLIs (create-client)
   chaos/                      # demo:chaos (orchestrator + fake endpoint + PNG)
 docker/Dockerfile             # image multi-stage API + Worker
 docker-compose.yml            # dev local (Postgres + Redis)
-docker-compose.demo.yml       # chaos demo stack (build l'image)
-fly.toml                      # déploiement Fly (api + worker process groups)
+docker-compose.demo.yml       # chaos demo stack (builds the image)
+fly.toml                      # Fly deployment (api + worker process groups)
 .github/workflows/            # ci.yml + deploy.yml
 tests/integration/            # 16 tests Testcontainers
-docs/superpowers/             # specs et plans
-docs/chaos-runs/              # PNG du dernier run chaos
+docs/superpowers/             # specs and plans
+docs/chaos-runs/              # PNG of the latest chaos run
 ```
 
-- [ ] **Step 6 : Vérifier le rendu**
+- [ ] **Step 6: Check the rendering**
 
 ```bash
 cat README.md | head -30
-grep -c "fly.dev" README.md  # > 0 attendu
-grep -c "docs/chaos-runs/" README.md  # > 0 attendu
+grep -c "fly.dev" README.md  # > 0 expected
+grep -c "docs/chaos-runs/" README.md  # > 0 expected
 ```
 
-- [ ] **Step 7 : Commit avec le PNG du chaos run**
+- [ ] **Step 7: Commit with the chaos run PNG**
 
 ```bash
 git add README.md docs/chaos-runs/*.png
@@ -1844,30 +1844,30 @@ git commit -m "docs: embed chaos PNG, add live URL and CI badge to README"
 
 ---
 
-### Task G.2 — Documenter le critère "Out of scope V1" verbatim depuis le spec
+### Task G.2 — Document the "Out of scope V1" criterion verbatim from the spec
 
-Le spec section 1 demande explicitement que cette section soit reproduite verbatim. Plan 1 a livré une version courte ; on la garde mais on ajoute un lien explicite vers la section 10 du spec qui contient la liste verbatim. Vérifier que le README pointe bien là.
+Spec section 1 explicitly requires this section to be reproduced verbatim. Plan 1 shipped a short version; we keep it but add an explicit link to section 10 of the spec, which contains the verbatim list. Check that the README points there.
 
 **Files:**
 - Modify: `README.md` (idempotent)
 
-- [ ] **Step 1 : Vérifier que le lien existe**
+- [ ] **Step 1: Check that the link exists**
 
 ```bash
 grep -n "section 10" README.md
 ```
 
-Expected : au moins une occurrence dans la section "Out of scope V1".
+Expected: at least one occurrence in the "Out of scope V1" section.
 
-- [ ] **Step 2 : Si absent, l'ajouter**
+- [ ] **Step 2: If missing, add it**
 
-Sinon, dans la section `## Out of scope V1`, vérifier qu'on a quelque chose comme :
+Otherwise, in the `## Out of scope V1` section, check that there is something like:
 
-> Voir [`docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md`](docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md) section 10 pour la liste exhaustive.
+> See [`docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md`](docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md) section 10 for the exhaustive list.
 
-- [ ] **Step 3 : Pas de commit séparé si rien à modifier**
+- [ ] **Step 3: No separate commit if nothing to change**
 
-Si une modif a été faite :
+If a change was made:
 
 ```bash
 git add README.md
@@ -1876,50 +1876,50 @@ git commit -m "docs: link verbatim out-of-scope section in spec from README"
 
 ---
 
-### Task G.3 — Vérification finale du critère de fin (Definition of Done V1)
+### Task G.3 — Final check of the completion criteria (Definition of Done V1)
 
-⚠️ Tâche de validation, pas de code.
+⚠️ Validation task, no code.
 
-Reprendre le spec section 1 ("Critères de fin V1") point par point :
+Go through spec section 1 ("V1 completion criteria") point by point:
 
-- [ ] **Routes API spécifiées section 3** → vérifier en lisant `apps/api/src/routes/` que toutes les routes du spec sont présentes (devrait être OK depuis Plan 1).
-- [ ] **Suite de tests unit + integration verte** :
+- [ ] **API routes specified in section 3** → check by reading `apps/api/src/routes/` that all spec routes are present (should be OK since Plan 1).
+- [ ] **Unit + integration test suite green**:
 
 ```bash
 pnpm test:unit && pnpm test:integration
 ```
 
-Expected : tous verts.
+Expected: all green.
 
-- [ ] **`pnpm demo:chaos` end-to-end + PNG dans `docs/chaos-runs/`** :
+- [ ] **`pnpm demo:chaos` end-to-end + PNG in `docs/chaos-runs/`**:
 
 ```bash
 ls docs/chaos-runs/*.png
 ```
 
-Expected : au moins un PNG.
+Expected: at least one PNG.
 
-- [ ] **Service déployé sur Fly.io accessible via URL publique** :
+- [ ] **Service deployed on Fly.io, reachable via public URL**:
 
 ```bash
 curl -s https://vitrine-webhook-demo.fly.dev/ready
 ```
 
-Expected : `{"ok":true}`.
+Expected: `{"ok":true}`.
 
-- [ ] **README** : description, lien Standard Webhooks, run local, PNG embed, section "Out of scope V1" → vérification visuelle de `README.md`.
+- [ ] **README**: description, Standard Webhooks link, local run, PNG embed, "Out of scope V1" section → visual check of `README.md`.
 
-- [ ] **CI verte sur main** :
+- [ ] **CI green on main**:
 
 ```bash
 gh run list --workflow ci.yml --branch main --limit 3
 ```
 
-Expected : tous `completed` `success`.
+Expected: all `completed` `success`.
 
-- [ ] **Step finale : Commit récapitulatif (rien si tout est déjà committé)**
+- [ ] **Final step: Wrap-up commit (nothing if everything is already committed)**
 
-Si une dérive est détectée, fix + commit. Sinon : tag de fin de plan facultatif :
+If any drift is detected, fix + commit. Otherwise: optional end-of-plan tag:
 
 ```bash
 git tag v1.0.0-vitrine-m6
@@ -1929,39 +1929,39 @@ git tag v1.0.0-vitrine-m6
 
 ## Self-review
 
-Le rédacteur de ce plan se relit :
+The author of this plan reviews it:
 
-**Spec coverage** :
-- Section 1 (objectifs, critère de fin V1)
-  - "Toutes les routes API implémentées" → couvert par Plan 1, vérifié en G.3 ✓
-  - "Suite tests unit+integration verte" → vérifié en E.1 (CI) et G.3 ✓
-  - "Chaos script + PNG dans docs/chaos-runs/" → Phases B + C + D.3 ✓
-  - "Déployé Fly.io URL publique" → Phase F ✓
+**Spec coverage**:
+- Section 1 (goals, V1 completion criteria)
+  - "All API routes implemented" → covered by Plan 1, checked in G.3 ✓
+  - "Unit+integration test suite green" → checked in E.1 (CI) and G.3 ✓
+  - "Chaos script + PNG in docs/chaos-runs/" → Phases B + C + D.3 ✓
+  - "Deployed on Fly.io, public URL" → Phase F ✓
   - "README" → Phase G ✓
-  - "CI verte sur main" → Phase E ✓
+  - "CI green on main" → Phase E ✓
 - Section 7.3 (chaos demo) → Phases B + C ✓
 - Section 7.4 (CI) → Phase E ✓
-- Section 9 (déploiement) → Phases D + F ✓
+- Section 9 (deployment) → Phases D + F ✓
 
-**Placeholder scan** :
-- "TBD" / "TODO" : aucun.
-- "Add appropriate error handling" : aucun. Les erreurs sont explicites (try/catch dans `bootChaosStack.teardown`, `pushEvents` warn sur status non-2xx).
-- "Similar to Task N" : non utilisé. Chaque task répète son code.
-- ⚠️ Notes utilisées comme garde-fous (pas placeholders) : compose ↔ Dockerfile pairing en C.1, host.docker.internal Linux en C.4, `--prod=false` justifié en D.1, `MASTER_ENCRYPTION_KEY` non rotatable en F.2.5.
+**Placeholder scan**:
+- "TBD" / "TODO": none.
+- "Add appropriate error handling": none. Errors are explicit (try/catch in `bootChaosStack.teardown`, `pushEvents` warns on non-2xx status).
+- "Similar to Task N": not used. Each task repeats its code.
+- ⚠️ Notes used as guardrails (not placeholders): compose ↔ Dockerfile pairing in C.1, host.docker.internal on Linux in C.4, `--prod=false` justified in D.1, `MASTER_ENCRYPTION_KEY` not rotatable in F.2.5.
 
-**Type consistency** :
-- `Sample` défini en C.2, consommé en C.3 et C.5 ✓
-- `PhaseConfig` / `CHAOS_PHASES` définis en B.1, consommés en C.5 ✓
-- `ChaosStack` défini en C.4, consommé en C.5 ✓
-- `bootChaosStack({ endpointUrl })` cohérent entre C.4 et C.5 ✓
-- `seedClient` / `seedEndpoint` viennent de `@vitrine/test-helpers` (Plan 1) — interface compatible avec `seedClient(db, { name })` qui retourne `{ clientId, apiKey }`, et `seedEndpoint(db, { clientId, url, masterKey })` qui retourne `{ endpointId, secret }`. Cohérent avec la signature actuelle dans le repo (vérifié) ✓
-- `apiBaseUrl` / `apiKey` / `endpointId` cohérents entre orchestrator et runner ✓
-- Script `start` de l'API/Worker cohérent entre D.1 (modif package.json) et docker-compose.demo.yml C.1 (`pnpm --filter ... start`) et fly.toml F.1 (`pnpm --filter ... start`) ✓
+**Type consistency**:
+- `Sample` defined in C.2, consumed in C.3 and C.5 ✓
+- `PhaseConfig` / `CHAOS_PHASES` defined in B.1, consumed in C.5 ✓
+- `ChaosStack` defined in C.4, consumed in C.5 ✓
+- `bootChaosStack({ endpointUrl })` consistent between C.4 and C.5 ✓
+- `seedClient` / `seedEndpoint` come from `@vitrine/test-helpers` (Plan 1) — interface compatible with `seedClient(db, { name })` returning `{ clientId, apiKey }`, and `seedEndpoint(db, { clientId, url, masterKey })` returning `{ endpointId, secret }`. Consistent with the current signature in the repo (verified) ✓
+- `apiBaseUrl` / `apiKey` / `endpointId` consistent between orchestrator and runner ✓
+- API/Worker `start` script consistent between D.1 (package.json change), docker-compose.demo.yml C.1 (`pnpm --filter ... start`) and fly.toml F.1 (`pnpm --filter ... start`) ✓
 
-**Issues fixed inline** :
-- C.3 initialement utilisait `chartjs-plugin-annotation` ; remplacé par un dataset bar empilé semi-transparent pour rester sans dépendance fragile.
-- D.1 initialement utilisait `tsc --build` puis `node dist/server.js` ; switch décidé pour tsx en runtime (cohérence avec `packages/*/src/index.ts` exportant du TS direct).
-- F.1 initialement deux fly apps distinctes ; consolidé en un seul app avec processes groups après lecture du spec section 9 qui autorise les deux.
+**Issues fixed inline**:
+- C.3 originally used `chartjs-plugin-annotation`; replaced with a semi-transparent stacked bar dataset to avoid a fragile dependency.
+- D.1 originally used `tsc --build` then `node dist/server.js`; switched to tsx at runtime (consistent with `packages/*/src/index.ts` exporting TS directly).
+- F.1 originally two separate fly apps; consolidated into a single app with process groups after reading spec section 9, which allows both.
 
 ---
 
@@ -1971,8 +1971,8 @@ Le rédacteur de ce plan se relit :
 
 Two execution options:
 
-**1. Subagent-Driven (recommended)** — fresh subagent par task, review entre tasks, fast iteration.
+**1. Subagent-Driven (recommended)** — fresh subagent per task, review between tasks, fast iteration.
 
-**2. Inline Execution** — exécute les tasks dans cette session via executing-plans, batch execution avec checkpoints.
+**2. Inline Execution** — execute the tasks in this session via executing-plans, batch execution with checkpoints.
 
-Lequel ?
+Which one?

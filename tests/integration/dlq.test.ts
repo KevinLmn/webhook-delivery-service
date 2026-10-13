@@ -30,7 +30,7 @@ describe('dlq after exhausting retries', () => {
     await fake.close()
   })
 
-  it('arrive en status=dead avec 7 tentatives', async () => {
+  it('ends in status=dead after 7 attempts', async () => {
     const { clientId, apiKey } = await seedClient(app.db, { name: 'dlq' })
     const { endpointId } = await seedEndpoint(app.db, {
       clientId,

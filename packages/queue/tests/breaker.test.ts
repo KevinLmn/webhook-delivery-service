@@ -21,13 +21,13 @@ describe('record_outcome.lua', () => {
     await container?.stop()
   })
 
-  it('démarre en closed avec failCount=0 (read sur clé absente)', async () => {
+  it('starts closed with failCount=0 (read on missing key)', async () => {
     const r = await recordOutcome(redis, 'ep_test1', 'read', Date.now())
     expect(r.state).toBe('closed')
     expect(r.failCount).toBe(0)
   })
 
-  it('5 failures consécutifs → open', async () => {
+  it('5 consecutive failures → open', async () => {
     const ep = 'ep_test2'
     for (let i = 0; i < 4; i++) {
       const r = await recordOutcome(redis, ep, 'failure', Date.now())
@@ -39,7 +39,7 @@ describe('record_outcome.lua', () => {
     expect(final.openDurationMs).toBe(30_000)
   })
 
-  it('open expire → half_open puis success → closed', async () => {
+  it('open expires → half_open then success → closed', async () => {
     const ep = 'ep_test3'
     for (let i = 0; i < 5; i++) await recordOutcome(redis, ep, 'failure', 1_000_000)
     // simulate now > openedAt + 30s
@@ -49,7 +49,7 @@ describe('record_outcome.lua', () => {
     expect(closed.state).toBe('closed')
   })
 
-  it('half_open + failure → open avec duration doublée', async () => {
+  it('half_open + failure → open with doubled duration', async () => {
     const ep = 'ep_test4'
     for (let i = 0; i < 5; i++) await recordOutcome(redis, ep, 'failure', 2_000_000)
     await recordOutcome(redis, ep, 'read', 2_000_000 + 31_000) // → half_open

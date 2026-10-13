@@ -1,3 +1,8 @@
+// ============================================================================
+//  deliver.ts — ORCHESTRATION of ONE delivery attempt.
+//  Chains: read breaker → (deliver) → record the attempt → update breaker
+//  → update event. Returns a DECISION (success/retry/dlq/breaker_skip) to the worker.
+// ============================================================================
 import { eq, sql } from 'drizzle-orm'
 import { deliveryAttempts, endpoints, events, type DbClient } from '@vitrine/db'
 import { recordOutcome, type DeliveryJobData } from '@vitrine/queue'
@@ -8,7 +13,7 @@ import type { Logger } from 'pino'
 import { deliverOnce } from './http-client'
 
 const TIMEOUT_MS = 10_000
-const MAX_RETRY_AFTER_MS = 6 * 3600 * 1000
+const MAX_RETRY_AFTER_MS = 6 * 3600 * 1000 // cap any Retry-After at 6h
 
 export interface DeliverContext {
   db: DbClient
@@ -17,17 +22,20 @@ export interface DeliverContext {
   logger: Logger
 }
 
+// The possible decisions returned to the worker:
 export type DeliverResult =
-  | { kind: 'success' }
-  | { kind: 'retry'; reason: Outcome['kind']; delayOverrideMs?: number }
-  | { kind: 'dlq'; reason: Outcome['kind'] }
-  | { kind: 'breaker_skip'; remainingMs: number }
+  | { kind: 'success' }                                        // delivered → return
+  | { kind: 'retry'; reason: Outcome['kind']; delayOverrideMs?: number } // try again
+  | { kind: 'dlq'; reason: Outcome['kind'] }                  // terminal → event "dead"
+  | { kind: 'breaker_skip'; remainingMs: number }             // endpoint cut off → postpone
 
 export async function deliver(
   ctx: DeliverContext,
   job: Job<DeliveryJobData>
 ): Promise<DeliverResult> {
   const eventId = job.data.eventId
+
+  // 1) Load the event + its endpoint (join).
   const [evRow] = await ctx.db
     .select({ event: events, endpoint: endpoints })
     .from(events)
@@ -39,22 +47,29 @@ export async function deliver(
     return { kind: 'dlq', reason: 'http_4xx' } // synthetic; treated as terminal
   }
 
+  // 2) READ the breaker (event 'read').
   const breaker = await recordOutcome(ctx.redis, evRow.endpoint.id, 'read', Date.now())
+
+  // 2a) OPEN → don't deliver, postpone (the worker will call moveToDelayed).
   if (breaker.state === 'open') {
     const remaining = (breaker.openedAt ?? 0) + breaker.openDurationMs - Date.now()
+    // skip counter (observability, 1h TTL)
     await ctx.redis.incr(`breaker:skip_count:${evRow.endpoint.id}`)
     await ctx.redis.expire(`breaker:skip_count:${evRow.endpoint.id}`, 3600)
     return { kind: 'breaker_skip', remainingMs: Math.max(remaining, 1000) }
   }
 
+  // 2b) HALF_OPEN → ⭐ PROBE LOCK: ONE worker probes, the others postpone.
+  //     (Avoids a thundering herd on reopening.)
   if (breaker.state === 'half_open') {
     const lockKey = `breaker:${evRow.endpoint.id}:probe_lock`
-    const acquired = await ctx.redis.set(lockKey, '1', 'EX', 5, 'NX')
+    const acquired = await ctx.redis.set(lockKey, '1', 'EX', 5, 'NX') // SET NX = atomic lock
     if (!acquired) {
-      return { kind: 'breaker_skip', remainingMs: 1000 }
+      return { kind: 'breaker_skip', remainingMs: 1000 } // another one is already probing → come back later
     }
   }
 
+  // 3) Decrypt the secret, sign, POST (one attempt).
   const secret = decryptSecret(evRow.endpoint.secretEncrypted, ctx.masterKey)
   const timestamp = Math.floor(Date.now() / 1000)
   const body = JSON.stringify(evRow.event.payload)
@@ -68,7 +83,7 @@ export async function deliver(
     timeoutMs: TIMEOUT_MS
   })
 
-  // Determine attempt number = max(existing) + 1
+  // 4) Record this attempt. attemptNumber = max(existing) + 1.
   const [maxRow] = await ctx.db
     .select({ max: sql<number>`COALESCE(MAX(${deliveryAttempts.attemptNumber}), 0)` })
     .from(deliveryAttempts)
@@ -85,7 +100,9 @@ export async function deliver(
     responseBodyExcerpt: result.responseBodyExcerpt
   })
 
-  // Record breaker outcome
+  // 5) Depending on the result: update breaker + update event + decision.
+
+  // 5a) SUCCESS (2xx/3xx) → breaker success, event "delivered".
   if (result.outcome.kind === 'success') {
     await recordOutcome(ctx.redis, evRow.endpoint.id, 'success', Date.now())
     await ctx.db
@@ -95,8 +112,9 @@ export async function deliver(
     return { kind: 'success' }
   }
 
+  // 5b) 4xx → ⭐ breaker "success" (the endpoint is ALIVE, it just rejects this
+  //     content), but event "dead" (retrying wouldn't change anything).
   if (result.outcome.kind === 'http_4xx') {
-    // 4xx counts as success for breaker (the endpoint is alive, just rejecting this event)
     await recordOutcome(ctx.redis, evRow.endpoint.id, 'success', Date.now())
     await ctx.db
       .update(events)
@@ -105,8 +123,10 @@ export async function deliver(
     return { kind: 'dlq', reason: 'http_4xx' }
   }
 
+  // 5c) Everything else (5xx, timeout, network, throttle) → breaker "failure" + retry.
   await recordOutcome(ctx.redis, evRow.endpoint.id, 'failure', Date.now())
 
+  // 429: honor Retry-After if present and valid.
   if (result.outcome.kind === 'throttle') {
     const overrideMs =
       parseRetryAfter(result.outcome.retryAfterRaw, Date.now(), MAX_RETRY_AFTER_MS) ?? undefined
@@ -115,5 +135,6 @@ export async function deliver(
       : { kind: 'retry', reason: 'throttle' }
   }
 
+  // 5xx / timeout / network → normal retry (BullMQ will apply the backoff).
   return { kind: 'retry', reason: result.outcome.kind }
 }

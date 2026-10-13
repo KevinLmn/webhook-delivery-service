@@ -30,7 +30,7 @@ describe('replay variants (dead/delivered/pending)', () => {
     await fake.close()
   })
 
-  it('replay dead → re-livré', async () => {
+  it('replay dead → redelivered', async () => {
     const { clientId, apiKey } = await seedClient(app.db, { name: 'replay-dead' })
     const { endpointId } = await seedEndpoint(app.db, {
       clientId,
@@ -82,7 +82,7 @@ describe('replay variants (dead/delivered/pending)', () => {
     }, 5_000)
   })
 
-  it('replay delivered → autorisé et re-livré', async () => {
+  it('replay delivered → allowed and redelivered', async () => {
     const { clientId, apiKey } = await seedClient(app.db, { name: 'replay-delivered' })
     const { endpointId } = await seedEndpoint(app.db, {
       clientId,

@@ -35,16 +35,16 @@ describe('breaker FSM transition', () => {
     expect(transition(closed(2), 'failure', NOW)).toEqual(closed(3))
   })
 
-  it('closed + 5e failure consécutif → open (30s)', () => {
+  it('closed + 5th consecutive failure → open (30s)', () => {
     expect(transition(closed(4), 'failure', NOW)).toEqual(open(INITIAL_OPEN_MS, NOW))
   })
 
-  it('open avant TTL + read → reste open (lazy)', () => {
+  it('open before TTL + read → stays open (lazy)', () => {
     const s = open(INITIAL_OPEN_MS, NOW - 10_000)
     expect(transition(s, 'read', NOW)).toEqual(s)
   })
 
-  it('open après TTL + read → half_open (lazy)', () => {
+  it('open after TTL + read → half_open (lazy)', () => {
     const s = open(INITIAL_OPEN_MS, NOW - INITIAL_OPEN_MS - 1)
     expect(transition(s, 'read', NOW)).toEqual(halfOpen(INITIAL_OPEN_MS))
   })
@@ -53,22 +53,22 @@ describe('breaker FSM transition', () => {
     expect(transition(halfOpen(120_000), 'success', NOW)).toEqual(closed(0))
   })
 
-  it('half_open + failure (probe) → open (duration doublée)', () => {
+  it('half_open + failure (probe) → open (duration doubled)', () => {
     expect(transition(halfOpen(60_000), 'failure', NOW)).toEqual(open(120_000, NOW))
   })
 
-  it('half_open + failure plafonné à 30 min', () => {
+  it('half_open + failure capped at 30 min', () => {
     expect(transition(halfOpen(20 * 60_000), 'failure', NOW)).toEqual(open(MAX_OPEN_MS, NOW))
   })
 
-  it('open + success (impossible normalement, défensif) → closed', () => {
-    // Cas défensif : si jamais une success arrive en open avant TTL, on close.
-    // Cela ne doit pas arriver car le worker moveToDelayed avant.
+  it('open + success (normally impossible, defensive) → closed', () => {
+    // Defensive case: if a success ever arrives while open before TTL, close.
+    // This shouldn't happen since the worker calls moveToDelayed first.
     expect(transition(open(INITIAL_OPEN_MS, NOW - 1000), 'success', NOW).state).toBe('closed')
   })
 
-  it('open + failure (avant TTL) → reste open avec compteur réinitialisé', () => {
-    // Cas défensif : un échec qui arriverait quand même en open (race). On garde l'état.
+  it('open + failure (before TTL) → stays open with counter reset', () => {
+    // Defensive case: a failure that still arrives while open (race). Keep the state.
     const s = open(INITIAL_OPEN_MS, NOW - 1000)
     expect(transition(s, 'failure', NOW)).toEqual(s)
   })

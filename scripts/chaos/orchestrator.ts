@@ -23,7 +23,7 @@ export interface ChaosStack {
   clientId: string
   endpointId: string
   endpointSecret: string
-  /** stop le compose et ferme les clients */
+  /** stops the compose stack and closes the clients */
   teardown: () => Promise<void>
 }
 
@@ -46,7 +46,7 @@ async function waitForApi(baseUrl: string, timeoutMs: number): Promise<void> {
       }
       await r.body.dump()
     } catch {
-      // pas encore prêt
+      // not ready yet
     }
     await sleep(1000)
   }
@@ -59,7 +59,7 @@ export async function bootChaosStack(opts: {
   const masterKey = randomBytes(32)
   const masterKeyB64 = masterKey.toString('base64')
 
-  // 1) build + up le stack (migrate s'exécute en init via depends_on)
+  // 1) build + up the stack (migrate runs as init via depends_on)
   run('docker', ['compose', '-f', COMPOSE_FILE, 'down', '-v'])
   run(
     'docker',
@@ -71,10 +71,10 @@ export async function bootChaosStack(opts: {
   const databaseUrl = `postgres://postgres:postgres@127.0.0.1:${HOST_PG_PORT}/${DB_NAME}`
   const redisUrl = `redis://127.0.0.1:${HOST_REDIS_PORT}`
 
-  // 2) attendre /ready
+  // 2) wait for /ready
   await waitForApi(apiBaseUrl, 60_000)
 
-  // 3) seed client + endpoint via les helpers du package test-helpers
+  // 3) seed client + endpoint via the test-helpers package helpers
   const db = createDbClient(databaseUrl)
   const redis = new IORedis(redisUrl, { maxRetriesPerRequest: null })
 
@@ -102,8 +102,8 @@ export async function bootChaosStack(opts: {
       } catch {
         // ignore
       }
-      // postgres-js : pas de close trivial sur l'interface drizzle ; le tear down
-      // du compose suffit à libérer les ressources réseau côté host.
+      // postgres-js: no trivial close on the drizzle interface; tearing down
+      // the compose stack is enough to free host-side network resources.
       run('docker', ['compose', '-f', COMPOSE_FILE, 'down', '-v'])
     }
   }

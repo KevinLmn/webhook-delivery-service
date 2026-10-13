@@ -14,7 +14,7 @@ export async function replayEvent(opts: {
   clientId: string
   eventId: string
 }): Promise<ReplayResult> {
-  // Vérifier ownership: l'event appartient à un endpoint du client.
+  // Check ownership: the event belongs to one of the client's endpoints.
   const [row] = await opts.db
     .select({ event: events, endpoint: endpoints })
     .from(events)

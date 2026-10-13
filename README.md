@@ -2,79 +2,79 @@
 
 [![CI](https://github.com/KevinLmn/webhook-delivery-service/actions/workflows/ci.yml/badge.svg)](https://github.com/KevinLmn/webhook-delivery-service/actions/workflows/ci.yml)
 
-Service Node/TypeScript qui ingère des événements via une API HTTP et les livre à des endpoints clients tiers, avec retry exponentiel, circuit breaker, idempotency keys et replay manuel. Modèle d'API aligné sur [Standard Webhooks](https://www.standardwebhooks.com).
+Node/TypeScript service that ingests events through an HTTP API and delivers them to third-party client endpoints, with exponential retry, circuit breaker, idempotency keys and manual replay. API model aligned with [Standard Webhooks](https://www.standardwebhooks.com).
 
-> Projet vitrine. Pas un service de production utilisé par de vrais clients.
+> Showcase project. Not a production service used by real customers.
 
-**Live demo** : https://vitrine-webhook-demo.fly.dev/ready (Fly.io single region `cdg` + Neon Postgres + Upstash Redis).
+**Live demo**: https://vitrine-webhook-demo.fly.dev/ready (Fly.io single region `cdg` + Neon Postgres + Upstash Redis).
 
-## Fonctionnalités V1
+## V1 features
 
-- API multi-tenant Fastify avec auth Bearer (argon2id).
-- Idempotency keys obligatoires (Redis, TTL 24h).
-- Worker BullMQ avec retry exponentiel (1s → 10s → 1min → 10min → 1h → 6h, 7 attempts max).
-- Circuit breaker partagé (state machine atomique en Lua).
-- Signature HMAC Standard Webhooks (`webhook-id`, `webhook-timestamp`, `webhook-signature`).
-- Secrets chiffrés au repos (AES-256-GCM, master key séparée).
-- Replay single-event.
-- Tests d'intégration avec Testcontainers (Postgres + Redis).
+- Multi-tenant Fastify API with Bearer auth (argon2id).
+- Mandatory idempotency keys (Redis, 24h TTL).
+- BullMQ worker with exponential retry (1s → 10s → 1min → 10min → 1h → 6h, 7 attempts max).
+- Shared circuit breaker (atomic state machine in Lua).
+- Standard Webhooks HMAC signature (`webhook-id`, `webhook-timestamp`, `webhook-signature`).
+- Secrets encrypted at rest (AES-256-GCM, separate master key).
+- Single-event replay.
+- Integration tests with Testcontainers (Postgres + Redis).
 
-### Note d'interopérabilité Standard Webhooks
+### Standard Webhooks interoperability note
 
-L'implémentation suit la **forme** Standard Webhooks (signed string `id.timestamp.body`, headers `webhook-*`, scheme `v1,<base64>`), mais utilise le secret **en UTF-8 brut** comme clé HMAC. La variante Svix décode le secret en base64 après strip du préfixe `whsec_` avant HMAC. Les consommateurs Svix bit-for-bit ne valideront donc pas nos signatures sans adapter leur clé HMAC. Le format de header et la chaîne signée restent compatibles.
+The implementation follows the Standard Webhooks **shape** (signed string `id.timestamp.body`, `webhook-*` headers, `v1,<base64>` scheme), but uses the secret **as raw UTF-8** as the HMAC key. The Svix variant base64-decodes the secret after stripping the `whsec_` prefix before HMAC. Bit-for-bit Svix consumers will therefore not validate our signatures without adapting their HMAC key. The header format and the signed string remain compatible.
 
 ## Out of scope V1
 
-Voir [`docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md`](docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md) section 10. En particulier : pas de signup public, pas de rotation de secret endpoint, pas de batch replay, pas d'observabilité prod-grade, pas de SDK clients, pas de port Rust (autre spec), pas de dashboard (autre spec), pas d'AWS (autre spec).
+See [`docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md`](docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md) section 10. In particular: no public signup, no endpoint secret rotation, no batch replay, no production-grade observability, no client SDKs, no Rust port (separate spec), no dashboard (separate spec), no AWS (separate spec).
 
-## Run local
+## Run locally
 
-Pré-requis : Node 22 LTS, pnpm 9, Docker Compose.
+Prerequisites: Node 22 LTS, pnpm 9, Docker Compose.
 
 ```bash
 nvm use
 pnpm install
 
-# infra locale (Postgres + Redis)
+# local infra (Postgres + Redis)
 docker compose up -d
 
 # migrations
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/vitrine pnpm db:push
 
-# créer un client (note l'API key, affichée une seule fois)
+# create a client (note the API key, shown only once)
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/vitrine \
   pnpm cli:create-client --name local
 
-# .env (cf. .env.example)
+# .env (see .env.example)
 cp .env.example .env
-# remplir MASTER_ENCRYPTION_KEY = $(openssl rand -base64 32)
+# set MASTER_ENCRYPTION_KEY = $(openssl rand -base64 32)
 
-# lancer API + Worker en parallèle
+# run API + Worker in parallel
 pnpm dev
 ```
 
-### Smoke test end-to-end
+### End-to-end smoke test
 
-Une fois `pnpm dev` lancé, dans un autre terminal :
+Once `pnpm dev` is running, in another terminal:
 
 ```bash
-API_KEY=cl_secret_...  # depuis cli:create-client
+API_KEY=cl_secret_...  # from cli:create-client
 
-# créer un endpoint
+# create an endpoint
 curl -s -X POST http://localhost:3000/endpoints \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"url":"https://httpbin.org/post"}'
-# → noter ep_xxx
+# → note ep_xxx
 
-# pousser un event
+# push an event
 curl -s -X POST http://localhost:3000/events \
   -H "Authorization: Bearer $API_KEY" \
   -H "Idempotency-Key: smoke-1" \
   -H "Content-Type: application/json" \
   -d '{"endpoint_id":"ep_xxx","event_type":"smoke.test","payload":{"hello":"world"}}'
 
-# vérifier le status après ~5s
+# check the status after ~5s
 curl -s http://localhost:3000/events/evt_xxx -H "Authorization: Bearer $API_KEY"
 # → status: "delivered"
 ```
@@ -82,54 +82,54 @@ curl -s http://localhost:3000/events/evt_xxx -H "Authorization: Bearer $API_KEY"
 ## Tests
 
 ```bash
-pnpm test:unit           # tests unitaires (packages), < 5s
-pnpm test:integration    # 16 tests d'intégration (Testcontainers Postgres + Redis), ~3 min
+pnpm test:unit           # unit tests (packages), < 5s
+pnpm test:integration    # 16 integration tests (Testcontainers Postgres + Redis), ~3 min
 ```
 
 ## Chaos demo
 
-Le script `pnpm demo:chaos` orchestre une démo end-to-end qui :
+The `pnpm demo:chaos` script orchestrates an end-to-end demo that:
 
-1. spawn un fake endpoint local scénarisé en 4 phases (200 OK → 500 → 50/50 → 200 OK) ;
-2. boote un stack Postgres + Redis + API + Worker via `docker-compose.demo.yml` ;
-3. push 100 events sur 5 s, sample l'état du système à 1 Hz pendant ~140 s ;
-4. génère un PNG annoté dans `docs/chaos-runs/`.
+1. spawns a local fake endpoint scripted in 4 phases (200 OK → 500 → 50/50 → 200 OK);
+2. boots a Postgres + Redis + API + Worker stack via `docker-compose.demo.yml`;
+3. pushes 100 events over 5 s, samples the system state at 1 Hz for ~140 s;
+4. generates an annotated PNG in `docs/chaos-runs/`.
 
 ```bash
 pnpm demo:chaos
 ```
 
-Le run prend ~3 min. Le PNG illustre la mécanique du circuit breaker : ouverture pendant la phase de panne, transition `half_open` après le cooldown, retour à `closed` à la reprise.
+The run takes ~3 min. The PNG illustrates the circuit breaker mechanics: opening during the outage phase, `half_open` transition after the cooldown, back to `closed` on recovery.
 
-### Dernier run
+### Latest run
 
 ![Latest chaos run](docs/chaos-runs/<FILE_STEM>.png)
 
 ## Architecture
 
-Voir [`docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md`](docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md).
+See [`docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md`](docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md).
 
-## Déploiement
+## Deployment
 
-Image Docker multi-stage (`docker/Dockerfile`) commune à l'API et au Worker. Topologie Fly : un seul app avec deux process groups (`api` exposé HTTP, `worker` background).
+Multi-stage Docker image (`docker/Dockerfile`) shared by the API and the Worker. Fly topology: a single app with two process groups (`api` exposed over HTTP, `worker` in the background).
 
 ```bash
 flyctl deploy --app vitrine-webhook-demo
 ```
 
-Migrations Drizzle exécutées automatiquement avant chaque release via `release_command` dans `fly.toml`. Secrets gérés par `flyctl secrets set` (`DATABASE_URL`, `REDIS_URL`, `MASTER_ENCRYPTION_KEY`).
+Drizzle migrations run automatically before each release via `release_command` in `fly.toml`. Secrets managed with `flyctl secrets set` (`DATABASE_URL`, `REDIS_URL`, `MASTER_ENCRYPTION_KEY`).
 
-CD configurée : push to `main` déclenche `.github/workflows/deploy.yml` qui appelle `flyctl deploy --remote-only`.
+CD configured: a push to `main` triggers `.github/workflows/deploy.yml`, which calls `flyctl deploy --remote-only`.
 
-## Plan d'implémentation
+## Implementation plan
 
-Voir [`docs/superpowers/plans/2026-05-09-webhook-delivery-hot-path-core.md`](docs/superpowers/plans/2026-05-09-webhook-delivery-hot-path-core.md) pour le découpage tâche-par-tâche.
+See [`docs/superpowers/plans/2026-05-09-webhook-delivery-hot-path-core.md`](docs/superpowers/plans/2026-05-09-webhook-delivery-hot-path-core.md) for the task-by-task breakdown.
 
-## Structure du repo
+## Repo structure
 
 ```
 apps/
-  api/                        # Fastify, routes endpoints + events + replay
+  api/                        # Fastify, endpoints + events + replay routes
   worker/                     # BullMQ consumer, deliver orchestrator
 packages/
   core/                       # crypto, ids, retry schedule, signature, breaker logic
@@ -137,14 +137,14 @@ packages/
   queue/                      # BullMQ wrapper, Redis Lua scripts
   test-helpers/               # containers, app fixture, seed helpers
 scripts/
-  cli/                        # CLI utilitaires (create-client)
+  cli/                        # utility CLIs (create-client)
   chaos/                      # demo:chaos (orchestrator + fake endpoint + PNG)
-docker/Dockerfile             # image multi-stage API + Worker
-docker-compose.yml            # dev local (Postgres + Redis)
-docker-compose.demo.yml       # chaos demo stack (build l'image)
-fly.toml                      # déploiement Fly (api + worker process groups)
+docker/Dockerfile             # multi-stage API + Worker image
+docker-compose.yml            # local dev (Postgres + Redis)
+docker-compose.demo.yml       # chaos demo stack (builds the image)
+fly.toml                      # Fly deployment (api + worker process groups)
 .github/workflows/            # ci.yml + deploy.yml
-tests/integration/            # 16 tests Testcontainers
-docs/superpowers/             # specs et plans
-docs/chaos-runs/              # PNG du dernier run chaos
+tests/integration/            # 16 Testcontainers tests
+docs/superpowers/             # specs and plans
+docs/chaos-runs/              # PNG of the latest chaos run
 ```

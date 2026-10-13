@@ -74,7 +74,7 @@ async function main() {
   const runStartedAt = Date.now()
   const samples: Sample[] = []
 
-  // pousse les events dans la première fenêtre
+  // push the events during the first window
   log(`pushing ${TOTAL_EVENTS} events over ${PUSH_DURATION_MS}ms`)
   const pushPromise = pushEvents({
     apiBaseUrl: stack.apiBaseUrl,
@@ -84,7 +84,7 @@ async function main() {
     durationMs: PUSH_DURATION_MS
   })
 
-  // sample pendant toute la durée
+  // sample for the whole duration
   let nextTick = Date.now()
   while (Date.now() - runStartedAt < RUN_DURATION_MS) {
     nextTick += SAMPLE_INTERVAL_MS

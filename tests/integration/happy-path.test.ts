@@ -25,7 +25,7 @@ describe('happy path', () => {
     await fake.close()
   })
 
-  it('livre un event au premier coup', async () => {
+  it('delivers an event on the first attempt', async () => {
     const { clientId, apiKey } = await seedClient(app.db, { name: 'happy-path' })
     const { endpointId } = await seedEndpoint(app.db, {
       clientId,

@@ -2,23 +2,23 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Construire le coeur du Webhook Delivery Service jusqu'à un service Node/TS local entièrement fonctionnel avec ses tests d'intégration verts. Couvre les milestones M1-M4 du spec : foundation, API, worker delivery, tests Testcontainers.
+**Goal:** Build the core of the Webhook Delivery Service up to a fully working local Node/TS service with green integration tests. Covers milestones M1-M4 of the spec: foundation, API, worker delivery, Testcontainers tests.
 
-**Architecture:** Monolithique en monorepo pnpm. Deux apps (`apps/api`, `apps/worker`), trois packages partagés (`packages/core`, `packages/db`, `packages/queue`), un package de fixtures de test (`packages/test-helpers`). API Fastify ; worker BullMQ ; persistance Postgres via Drizzle ; état partagé Redis ; signature Standard Webhooks ; idempotency Redis ; circuit breaker piloté par Lua atomique.
+**Architecture:** Monolith in a pnpm monorepo. Two apps (`apps/api`, `apps/worker`), three shared packages (`packages/core`, `packages/db`, `packages/queue`), one test fixtures package (`packages/test-helpers`). Fastify API; BullMQ worker; Postgres persistence via Drizzle; shared state in Redis; Standard Webhooks signing; Redis idempotency; circuit breaker driven by atomic Lua.
 
 **Tech Stack:** Node.js 22 LTS, TypeScript 5.x, pnpm 9 workspace, Fastify 5, Zod 3, Drizzle ORM, BullMQ 5, ioredis 5, undici, Pino 9, Vitest 2, Testcontainers, Biome.
 
-**Out of this plan (déplacé en Plan 2)** : chaos script avec PNG, Dockerfile, fly.toml, GitHub Actions CI, README final.
+**Out of this plan (moved to Plan 2)**: chaos script with PNG, Dockerfile, fly.toml, GitHub Actions CI, final README.
 
 ---
 
-## Spec de référence
+## Reference spec
 
-`docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md`. Toute incohérence entre ce plan et le spec se résout en faveur du spec.
+`docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md`. Any inconsistency between this plan and the spec is resolved in favor of the spec.
 
 ---
 
-## File structure cible (à la fin de ce plan)
+## Target file structure (at the end of this plan)
 
 ```
 vitrine/
@@ -28,7 +28,7 @@ vitrine/
 │   │   │   ├── server.ts                # Fastify build + listen
 │   │   │   ├── plugins/
 │   │   │   │   ├── auth.ts              # Bearer token auth
-│   │   │   │   ├── error-handler.ts     # Erreurs structurées JSON
+│   │   │   │   ├── error-handler.ts     # Structured JSON errors
 │   │   │   │   └── db.ts                # Drizzle decorator
 │   │   │   ├── routes/
 │   │   │   │   ├── health.ts            # /health, /ready
@@ -52,14 +52,14 @@ vitrine/
 ├── packages/
 │   ├── core/
 │   │   ├── src/
-│   │   │   ├── ids.ts                   # ULID préfixé
+│   │   │   ├── ids.ts                   # Prefixed ULID
 │   │   │   ├── types.ts                 # Zod schemas + types
 │   │   │   ├── crypto/
 │   │   │   │   ├── hmac.ts              # signWebhook
 │   │   │   │   ├── encryption.ts        # AES-256-GCM
 │   │   │   │   └── password.ts          # argon2id
 │   │   │   ├── breaker/
-│   │   │   │   └── fsm.ts               # transition pure
+│   │   │   │   └── fsm.ts               # pure transition
 │   │   │   ├── retry/
 │   │   │   │   ├── backoff.ts           # delay + jitter
 │   │   │   │   ├── classify.ts          # classify outcome
@@ -73,7 +73,7 @@ vitrine/
 │   │   │   ├── schema.ts                # Drizzle tables
 │   │   │   ├── client.ts                # postgres-js + Drizzle factory
 │   │   │   └── index.ts
-│   │   ├── drizzle/                     # migrations générées
+│   │   ├── drizzle/                     # generated migrations
 │   │   ├── drizzle.config.ts
 │   │   ├── package.json
 │   │   └── tsconfig.json
@@ -83,19 +83,19 @@ vitrine/
 │   │   │   ├── delivery-queue.ts        # BullMQ Queue + custom backoff
 │   │   │   └── lua/
 │   │   │       └── record_outcome.lua
-│   │   ├── tests/                       # tests Lua avec Testcontainers
+│   │   ├── tests/                       # Lua tests with Testcontainers
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   └── test-helpers/
 │       ├── src/
 │       │   ├── containers.ts            # Postgres + Redis Testcontainers
 │       │   ├── fake-endpoint.ts         # harness Fastify configurable
-│       │   ├── seed.ts                  # création client/endpoint pour tests
-│       │   └── app-fixture.ts           # build l'API + worker pour tests
+│       │   ├── seed.ts                  # client/endpoint creation for tests
+│       │   └── app-fixture.ts           # builds the API + worker for tests
 │       ├── package.json
 │       └── tsconfig.json
 ├── tests/
-│   └── integration/                     # tests bout en bout au root
+│   └── integration/                     # end-to-end tests at the root
 │       ├── happy-path.test.ts
 │       ├── retry.test.ts
 │       ├── dlq.test.ts
@@ -113,8 +113,8 @@ vitrine/
 │       ├── specs/
 │       │   └── 2026-05-09-webhook-delivery-hot-path-design.md
 │       └── plans/
-│           └── 2026-05-09-webhook-delivery-hot-path-core.md  ← ce fichier
-├── docker-compose.yml                   # Postgres + Redis pour dev local
+│           └── 2026-05-09-webhook-delivery-hot-path-core.md  ← this file
+├── docker-compose.yml                   # Postgres + Redis for local dev
 ├── pnpm-workspace.yaml
 ├── package.json                         # root, scripts dev/test/typecheck
 ├── tsconfig.base.json
@@ -126,26 +126,26 @@ vitrine/
 
 ## Phase A — Workspace bootstrap (M1)
 
-### Task A.1 — Init pnpm workspace + Biome + tsconfig partagé
+### Task A.1 — Init pnpm workspace + Biome + shared tsconfig
 
 **Files:**
 - Create: `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `biome.json`, `.gitignore`, `.nvmrc`
 
-- [ ] **Step 1: Vérifier Node version**
+- [ ] **Step 1: Check Node version**
 
 ```bash
 node --version
 ```
 
-Expected: `v22.x.x`. Si pas le bon, `nvm install 22 && nvm use 22`.
+Expected: `v22.x.x`. If not, `nvm install 22 && nvm use 22`.
 
-- [ ] **Step 2: Créer `.nvmrc`**
+- [ ] **Step 2: Create `.nvmrc`**
 
 ```
 22
 ```
 
-- [ ] **Step 3: Créer `.gitignore`**
+- [ ] **Step 3: Create `.gitignore`**
 
 ```
 node_modules/
@@ -159,7 +159,7 @@ dist/
 coverage/
 ```
 
-- [ ] **Step 4: Créer `package.json` (root)**
+- [ ] **Step 4: Create `package.json` (root)**
 
 ```json
 {
@@ -193,7 +193,7 @@ coverage/
 }
 ```
 
-- [ ] **Step 5: Créer `pnpm-workspace.yaml`**
+- [ ] **Step 5: Create `pnpm-workspace.yaml`**
 
 ```yaml
 packages:
@@ -201,7 +201,7 @@ packages:
   - 'packages/*'
 ```
 
-- [ ] **Step 6: Créer `tsconfig.base.json`**
+- [ ] **Step 6: Create `tsconfig.base.json`**
 
 ```json
 {
@@ -227,7 +227,7 @@ packages:
 }
 ```
 
-- [ ] **Step 7: Créer `biome.json`**
+- [ ] **Step 7: Create `biome.json`**
 
 ```json
 {
@@ -247,13 +247,13 @@ packages:
 }
 ```
 
-- [ ] **Step 8: Installer**
+- [ ] **Step 8: Install**
 
 ```bash
 pnpm install
 ```
 
-Expected: `Done in <Ns>`, `node_modules/` créé.
+Expected: `Done in <Ns>`, `node_modules/` created.
 
 - [ ] **Step 9: Commit**
 
@@ -269,13 +269,13 @@ git commit -m "chore: bootstrap pnpm workspace with biome and tsconfig base"
 **Files:**
 - Create: `packages/core/package.json`, `packages/core/tsconfig.json`, `packages/core/src/index.ts`, `packages/core/vitest.config.ts`
 
-- [ ] **Step 1: Créer la structure**
+- [ ] **Step 1: Create the structure**
 
 ```bash
 mkdir -p packages/core/src packages/core/tests
 ```
 
-- [ ] **Step 2: Créer `packages/core/package.json`**
+- [ ] **Step 2: Create `packages/core/package.json`**
 
 ```json
 {
@@ -306,7 +306,7 @@ mkdir -p packages/core/src packages/core/tests
 }
 ```
 
-- [ ] **Step 3: Créer `packages/core/tsconfig.json`**
+- [ ] **Step 3: Create `packages/core/tsconfig.json`**
 
 ```json
 {
@@ -320,7 +320,7 @@ mkdir -p packages/core/src packages/core/tests
 }
 ```
 
-- [ ] **Step 4: Créer `packages/core/vitest.config.ts`**
+- [ ] **Step 4: Create `packages/core/vitest.config.ts`**
 
 ```typescript
 import { defineConfig } from 'vitest/config'
@@ -333,13 +333,13 @@ export default defineConfig({
 })
 ```
 
-- [ ] **Step 5: Créer `packages/core/src/index.ts`**
+- [ ] **Step 5: Create `packages/core/src/index.ts`**
 
 ```typescript
 export {}
 ```
 
-- [ ] **Step 6: Installer**
+- [ ] **Step 6: Install**
 
 ```bash
 pnpm install
@@ -354,18 +354,18 @@ git commit -m "chore(core): scaffold packages/core"
 
 ---
 
-### Task A.3 — Scaffold packages/db avec Drizzle
+### Task A.3 — Scaffold packages/db with Drizzle
 
 **Files:**
 - Create: `packages/db/package.json`, `packages/db/tsconfig.json`, `packages/db/drizzle.config.ts`, `packages/db/src/schema.ts`, `packages/db/src/client.ts`, `packages/db/src/index.ts`
 
-- [ ] **Step 1: Créer la structure**
+- [ ] **Step 1: Create the structure**
 
 ```bash
 mkdir -p packages/db/src packages/db/drizzle
 ```
 
-- [ ] **Step 2: Créer `packages/db/package.json`**
+- [ ] **Step 2: Create `packages/db/package.json`**
 
 ```json
 {
@@ -395,7 +395,7 @@ mkdir -p packages/db/src packages/db/drizzle
 }
 ```
 
-- [ ] **Step 3: Créer `packages/db/tsconfig.json`**
+- [ ] **Step 3: Create `packages/db/tsconfig.json`**
 
 ```json
 {
@@ -409,7 +409,7 @@ mkdir -p packages/db/src packages/db/drizzle
 }
 ```
 
-- [ ] **Step 4: Créer `packages/db/drizzle.config.ts`**
+- [ ] **Step 4: Create `packages/db/drizzle.config.ts`**
 
 ```typescript
 import { defineConfig } from 'drizzle-kit'
@@ -426,7 +426,7 @@ export default defineConfig({
 })
 ```
 
-- [ ] **Step 5: Créer `packages/db/src/schema.ts`**
+- [ ] **Step 5: Create `packages/db/src/schema.ts`**
 
 ```typescript
 import { sql } from 'drizzle-orm'
@@ -508,7 +508,7 @@ export type Event = typeof events.$inferSelect
 export type DeliveryAttempt = typeof deliveryAttempts.$inferSelect
 ```
 
-- [ ] **Step 6: Créer `packages/db/src/client.ts`**
+- [ ] **Step 6: Create `packages/db/src/client.ts`**
 
 ```typescript
 import { drizzle } from 'drizzle-orm/postgres-js'
@@ -523,14 +523,14 @@ export function createDbClient(connectionString: string) {
 }
 ```
 
-- [ ] **Step 7: Créer `packages/db/src/index.ts`**
+- [ ] **Step 7: Create `packages/db/src/index.ts`**
 
 ```typescript
 export * from './schema'
 export * from './client'
 ```
 
-- [ ] **Step 8: Installer**
+- [ ] **Step 8: Install**
 
 ```bash
 pnpm install
@@ -553,7 +553,7 @@ git commit -m "feat(db): add drizzle schema for clients, endpoints, events, deli
 - Create: `apps/api/package.json`, `apps/api/tsconfig.json`, `apps/api/src/server.ts`
 - Create: `apps/worker/package.json`, `apps/worker/tsconfig.json`, `apps/worker/src/worker.ts`
 
-- [ ] **Step 1: Créer la structure**
+- [ ] **Step 1: Create the structure**
 
 ```bash
 mkdir -p packages/queue/src/lua packages/queue/tests
@@ -562,7 +562,7 @@ mkdir -p apps/api/src/{plugins,routes,services}
 mkdir -p apps/worker/src
 ```
 
-- [ ] **Step 2: Créer `packages/queue/package.json`**
+- [ ] **Step 2: Create `packages/queue/package.json`**
 
 ```json
 {
@@ -587,7 +587,7 @@ mkdir -p apps/worker/src
 }
 ```
 
-- [ ] **Step 3: Créer `packages/queue/tsconfig.json`**
+- [ ] **Step 3: Create `packages/queue/tsconfig.json`**
 
 ```json
 {
@@ -597,13 +597,13 @@ mkdir -p apps/worker/src
 }
 ```
 
-- [ ] **Step 4: Créer `packages/queue/src/index.ts`**
+- [ ] **Step 4: Create `packages/queue/src/index.ts`**
 
 ```typescript
 export {}
 ```
 
-- [ ] **Step 5: Créer `packages/test-helpers/package.json`**
+- [ ] **Step 5: Create `packages/test-helpers/package.json`**
 
 ```json
 {
@@ -627,7 +627,7 @@ export {}
 }
 ```
 
-- [ ] **Step 6: Créer `packages/test-helpers/tsconfig.json`**
+- [ ] **Step 6: Create `packages/test-helpers/tsconfig.json`**
 
 ```json
 {
@@ -637,13 +637,13 @@ export {}
 }
 ```
 
-- [ ] **Step 7: Créer `packages/test-helpers/src/index.ts`**
+- [ ] **Step 7: Create `packages/test-helpers/src/index.ts`**
 
 ```typescript
 export {}
 ```
 
-- [ ] **Step 8: Créer `apps/api/package.json`**
+- [ ] **Step 8: Create `apps/api/package.json`**
 
 ```json
 {
@@ -672,7 +672,7 @@ export {}
 }
 ```
 
-- [ ] **Step 9: Créer `apps/api/tsconfig.json`**
+- [ ] **Step 9: Create `apps/api/tsconfig.json`**
 
 ```json
 {
@@ -682,7 +682,7 @@ export {}
 }
 ```
 
-- [ ] **Step 10: Créer `apps/api/src/server.ts` (placeholder)**
+- [ ] **Step 10: Create `apps/api/src/server.ts` (placeholder)**
 
 ```typescript
 import Fastify from 'fastify'
@@ -699,7 +699,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 }
 ```
 
-- [ ] **Step 11: Créer `apps/worker/package.json`**
+- [ ] **Step 11: Create `apps/worker/package.json`**
 
 ```json
 {
@@ -728,7 +728,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 }
 ```
 
-- [ ] **Step 12: Créer `apps/worker/tsconfig.json`**
+- [ ] **Step 12: Create `apps/worker/tsconfig.json`**
 
 ```json
 {
@@ -738,25 +738,25 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 }
 ```
 
-- [ ] **Step 13: Créer `apps/worker/src/worker.ts` (placeholder)**
+- [ ] **Step 13: Create `apps/worker/src/worker.ts` (placeholder)**
 
 ```typescript
 console.log('worker bootstrap pending')
 ```
 
-- [ ] **Step 14: Installer**
+- [ ] **Step 14: Install**
 
 ```bash
 pnpm install
 ```
 
-- [ ] **Step 15: Vérifier que tout typecheck**
+- [ ] **Step 15: Check that everything typechecks**
 
 ```bash
 pnpm typecheck
 ```
 
-Expected: tous les packages passent (le code est minimaliste).
+Expected: all packages pass (the code is minimal).
 
 - [ ] **Step 16: Commit**
 
@@ -767,12 +767,12 @@ git commit -m "chore: scaffold queue, test-helpers, api, worker packages"
 
 ---
 
-### Task A.5 — docker-compose pour Postgres + Redis local
+### Task A.5 — docker-compose for local Postgres + Redis
 
 **Files:**
 - Create: `docker-compose.yml`, `.env.example`
 
-- [ ] **Step 1: Créer `docker-compose.yml`**
+- [ ] **Step 1: Create `docker-compose.yml`**
 
 ```yaml
 services:
@@ -804,7 +804,7 @@ volumes:
   vitrine-pg:
 ```
 
-- [ ] **Step 2: Créer `.env.example`**
+- [ ] **Step 2: Create `.env.example`**
 
 ```
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/vitrine
@@ -815,24 +815,24 @@ PORT=3000
 NODE_ENV=development
 ```
 
-- [ ] **Step 3: Démarrer les services**
+- [ ] **Step 3: Start the services**
 
 ```bash
 docker compose up -d
 docker compose ps
 ```
 
-Expected: deux services `running (healthy)`.
+Expected: two services `running (healthy)`.
 
-- [ ] **Step 4: Tester la connexion Postgres**
+- [ ] **Step 4: Test the Postgres connection**
 
 ```bash
 docker compose exec postgres psql -U postgres -d vitrine -c "SELECT 1"
 ```
 
-Expected: `1` retourné.
+Expected: `1` returned.
 
-- [ ] **Step 5: Tester Redis**
+- [ ] **Step 5: Test Redis**
 
 ```bash
 docker compose exec redis redis-cli PING
@@ -840,27 +840,27 @@ docker compose exec redis redis-cli PING
 
 Expected: `PONG`.
 
-- [ ] **Step 6: Générer la première migration Drizzle**
+- [ ] **Step 6: Generate the first Drizzle migration**
 
 ```bash
 pnpm --filter @vitrine/db generate
 ```
 
-Expected: fichier `.sql` créé dans `packages/db/drizzle/`.
+Expected: `.sql` file created in `packages/db/drizzle/`.
 
-- [ ] **Step 7: Pousser la migration**
+- [ ] **Step 7: Push the migration**
 
 ```bash
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/vitrine pnpm --filter @vitrine/db push
 ```
 
-Expected: `Changes applied`. Tables présentes :
+Expected: `Changes applied`. Tables present:
 
 ```bash
 docker compose exec postgres psql -U postgres -d vitrine -c "\dt"
 ```
 
-Expected : `clients`, `endpoints`, `events`, `delivery_attempts`, `__drizzle_migrations`.
+Expected: `clients`, `endpoints`, `events`, `delivery_attempts`, `__drizzle_migrations`.
 
 - [ ] **Step 8: Commit**
 
@@ -873,24 +873,24 @@ git commit -m "chore: add docker-compose for local postgres and redis with initi
 
 ## Phase B — Crypto utilities (M1)
 
-### Task B.1 — HMAC signWebhook (TDD avec vecteurs Standard Webhooks)
+### Task B.1 — HMAC signWebhook (TDD with Standard Webhooks vectors)
 
 **Files:**
 - Create: `packages/core/src/crypto/hmac.ts`, `packages/core/src/crypto/index.ts`, `packages/core/tests/crypto/hmac.test.ts`
 
-- [ ] **Step 1: Écrire le test**
+- [ ] **Step 1: Write the test**
 
-Créer `packages/core/tests/crypto/hmac.test.ts` :
+Create `packages/core/tests/crypto/hmac.test.ts`:
 
 ```typescript
 import { describe, it, expect } from 'vitest'
 import { signWebhook, verifyWebhookSignature } from '../../src/crypto/hmac'
 
 describe('signWebhook', () => {
-  // Vecteur de test direct: secret 'whsec_C2FVsBQIhrscChlQIMV+b5sSYspob7oD'
+  // Direct test vector: secret 'whsec_C2FVsBQIhrscChlQIMV+b5sSYspob7oD'
   // id 'msg_p5jXN8AQM9LWM0D4loKWxJek', timestamp 1614265330, body '{"test": 2432232314}'
-  // Signature attendue (Standard Webhooks reference): v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE=
-  it('produit la signature attendue pour le vecteur de test Standard Webhooks', () => {
+  // Expected signature (Standard Webhooks reference): v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE=
+  it('produces the expected signature for the Standard Webhooks test vector', () => {
     const secret = 'whsec_C2FVsBQIhrscChlQIMV+b5sSYspob7oD'
     const id = 'msg_p5jXN8AQM9LWM0D4loKWxJek'
     const timestamp = 1614265330
@@ -901,39 +901,39 @@ describe('signWebhook', () => {
     expect(sig).toBe('v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE=')
   })
 
-  it('produit des signatures différentes pour des bodies différents', () => {
+  it('produces different signatures for different bodies', () => {
     const params = { secret: 's', id: 'i', timestamp: 1 }
     expect(signWebhook({ ...params, body: 'a' })).not.toBe(signWebhook({ ...params, body: 'b' }))
   })
 
-  it('roundtrip: la verification accepte la signature produite', () => {
+  it('roundtrip: verification accepts the produced signature', () => {
     const params = { secret: 'whsec_test', id: 'evt_1', timestamp: 1700000000, body: '{"x":1}' }
     const sig = signWebhook(params)
     expect(verifyWebhookSignature({ ...params, signature: sig })).toBe(true)
   })
 
-  it('verifyWebhookSignature rejette une signature falsifiée', () => {
+  it('verifyWebhookSignature rejects a tampered signature', () => {
     const params = { secret: 'whsec_test', id: 'evt_1', timestamp: 1700000000, body: '{"x":1}' }
     const tampered = signWebhook({ ...params, body: '{"x":2}' })
     expect(verifyWebhookSignature({ ...params, signature: tampered })).toBe(false)
   })
 
-  it('verifyWebhookSignature rejette une signature mal formée', () => {
+  it('verifyWebhookSignature rejects a malformed signature', () => {
     const params = { secret: 's', id: 'i', timestamp: 1, body: 'b', signature: 'malformed' }
     expect(verifyWebhookSignature(params)).toBe(false)
   })
 })
 ```
 
-- [ ] **Step 2: Lancer pour confirmer l'échec**
+- [ ] **Step 2: Run to confirm failure**
 
 ```bash
 pnpm --filter @vitrine/core test
 ```
 
-Expected: `FAIL` avec `Cannot find module '../../src/crypto/hmac'`.
+Expected: `FAIL` with `Cannot find module '../../src/crypto/hmac'`.
 
-- [ ] **Step 3: Implémenter `packages/core/src/crypto/hmac.ts`**
+- [ ] **Step 3: Implement `packages/core/src/crypto/hmac.ts`**
 
 ```typescript
 import { createHmac, timingSafeEqual } from 'node:crypto'
@@ -979,13 +979,13 @@ export function verifyWebhookSignature(params: VerifyParams): boolean {
 }
 ```
 
-- [ ] **Step 4: Créer `packages/core/src/crypto/index.ts`**
+- [ ] **Step 4: Create `packages/core/src/crypto/index.ts`**
 
 ```typescript
 export * from './hmac'
 ```
 
-- [ ] **Step 5: Lancer les tests**
+- [ ] **Step 5: Run the tests**
 
 ```bash
 pnpm --filter @vitrine/core test
@@ -993,7 +993,7 @@ pnpm --filter @vitrine/core test
 
 Expected: PASS, 5 tests.
 
-Note : si le vecteur de référence ne match pas exactement, vérifier en allant sur https://github.com/standard-webhooks/standard-webhooks/blob/main/spec/standard-webhooks.md — la signature exacte du vecteur peut nécessiter ajustement (certaines implémentations exposent le résultat raw vs base64 différemment). Si test 1 échoue mais le roundtrip passe, l'implémentation est correcte ; remplacer le vecteur attendu par celui produit par le code et noter le hash dans un commentaire.
+Note: if the reference vector doesn't match exactly, check https://github.com/standard-webhooks/standard-webhooks/blob/main/spec/standard-webhooks.md — the exact vector signature may need adjusting (some implementations expose the raw vs base64 result differently). If test 1 fails but the roundtrip passes, the implementation is correct; replace the expected vector with the one produced by the code and note the hash in a comment.
 
 - [ ] **Step 6: Commit**
 
@@ -1010,9 +1010,9 @@ git commit -m "feat(core/crypto): add Standard Webhooks HMAC sign and verify"
 - Create: `packages/core/src/crypto/encryption.ts`, `packages/core/tests/crypto/encryption.test.ts`
 - Modify: `packages/core/src/crypto/index.ts`
 
-- [ ] **Step 1: Écrire le test**
+- [ ] **Step 1: Write the test**
 
-`packages/core/tests/crypto/encryption.test.ts` :
+`packages/core/tests/crypto/encryption.test.ts`:
 
 ```typescript
 import { randomBytes } from 'node:crypto'
@@ -1029,33 +1029,33 @@ describe('encryption (AES-256-GCM)', () => {
     expect(decrypted).toBe(plaintext)
   })
 
-  it('produit un ciphertext différent à chaque appel (IV aléatoire)', () => {
+  it('produces a different ciphertext on each call (random IV)', () => {
     const plaintext = 'same_input'
     const c1 = encryptSecret(plaintext, masterKey)
     const c2 = encryptSecret(plaintext, masterKey)
     expect(Buffer.compare(c1, c2)).not.toBe(0)
   })
 
-  it('decrypt avec une mauvaise master key échoue', () => {
+  it('decrypt with a wrong master key fails', () => {
     const plaintext = 'secret'
     const ciphertext = encryptSecret(plaintext, masterKey)
     const wrongKey = randomBytes(32)
     expect(() => decryptSecret(ciphertext, wrongKey)).toThrow()
   })
 
-  it('decrypt avec un ciphertext altéré échoue (auth tag invalide)', () => {
+  it('decrypt with a tampered ciphertext fails (invalid auth tag)', () => {
     const ciphertext = encryptSecret('secret', masterKey)
     ciphertext[ciphertext.length - 1] ^= 1
     expect(() => decryptSecret(ciphertext, masterKey)).toThrow()
   })
 
-  it('rejette une master key qui ne fait pas 32 bytes', () => {
+  it('rejects a master key that is not 32 bytes', () => {
     expect(() => encryptSecret('x', randomBytes(16))).toThrow(/32 bytes/)
   })
 })
 ```
 
-- [ ] **Step 2: Lancer pour confirmer l'échec**
+- [ ] **Step 2: Run to confirm failure**
 
 ```bash
 pnpm --filter @vitrine/core test
@@ -1063,7 +1063,7 @@ pnpm --filter @vitrine/core test
 
 Expected: FAIL — `encryption` module not found.
 
-- [ ] **Step 3: Implémenter `packages/core/src/crypto/encryption.ts`**
+- [ ] **Step 3: Implement `packages/core/src/crypto/encryption.ts`**
 
 ```typescript
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
@@ -1099,20 +1099,20 @@ export function decryptSecret(ciphertext: Buffer, masterKey: Buffer): string {
 }
 ```
 
-- [ ] **Step 4: Mettre à jour `packages/core/src/crypto/index.ts`**
+- [ ] **Step 4: Update `packages/core/src/crypto/index.ts`**
 
 ```typescript
 export * from './hmac'
 export * from './encryption'
 ```
 
-- [ ] **Step 5: Lancer les tests**
+- [ ] **Step 5: Run the tests**
 
 ```bash
 pnpm --filter @vitrine/core test
 ```
 
-Expected: tous les tests passent (10 au total avec ceux de hmac).
+Expected: all tests pass (10 in total including the hmac ones).
 
 - [ ] **Step 6: Commit**
 
@@ -1129,32 +1129,32 @@ git commit -m "feat(core/crypto): add AES-256-GCM envelope encryption"
 - Create: `packages/core/src/crypto/password.ts`, `packages/core/tests/crypto/password.test.ts`
 - Modify: `packages/core/src/crypto/index.ts`
 
-- [ ] **Step 1: Écrire le test**
+- [ ] **Step 1: Write the test**
 
-`packages/core/tests/crypto/password.test.ts` :
+`packages/core/tests/crypto/password.test.ts`:
 
 ```typescript
 import { describe, it, expect } from 'vitest'
 import { hashApiKey, verifyApiKey } from '../../src/crypto/password'
 
 describe('password (argon2id)', () => {
-  it('hash retourne une string PHC argon2id', async () => {
+  it('hash returns an argon2id PHC string', async () => {
     const h = await hashApiKey('cl_secret_test_token')
     expect(h.startsWith('$argon2id$')).toBe(true)
   })
 
-  it('verify accepte le bon token', async () => {
+  it('verify accepts the correct token', async () => {
     const token = 'cl_secret_correct_horse_battery_staple'
     const h = await hashApiKey(token)
     expect(await verifyApiKey(h, token)).toBe(true)
   })
 
-  it('verify rejette un mauvais token', async () => {
+  it('verify rejects a wrong token', async () => {
     const h = await hashApiKey('right')
     expect(await verifyApiKey(h, 'wrong')).toBe(false)
   })
 
-  it('hash deux fois le même token produit deux hashes différents', async () => {
+  it('hashing the same token twice produces two different hashes', async () => {
     const token = 'same'
     const h1 = await hashApiKey(token)
     const h2 = await hashApiKey(token)
@@ -1163,7 +1163,7 @@ describe('password (argon2id)', () => {
 })
 ```
 
-- [ ] **Step 2: Lancer pour confirmer l'échec**
+- [ ] **Step 2: Run to confirm failure**
 
 ```bash
 pnpm --filter @vitrine/core test
@@ -1171,7 +1171,7 @@ pnpm --filter @vitrine/core test
 
 Expected: FAIL — `password` module not found.
 
-- [ ] **Step 3: Implémenter `packages/core/src/crypto/password.ts`**
+- [ ] **Step 3: Implement `packages/core/src/crypto/password.ts`**
 
 ```typescript
 import { hash, verify, Algorithm } from '@node-rs/argon2'
@@ -1196,7 +1196,7 @@ export async function verifyApiKey(storedHash: string, token: string): Promise<b
 }
 ```
 
-- [ ] **Step 4: Mettre à jour `packages/core/src/crypto/index.ts`**
+- [ ] **Step 4: Update `packages/core/src/crypto/index.ts`**
 
 ```typescript
 export * from './hmac'
@@ -1204,7 +1204,7 @@ export * from './encryption'
 export * from './password'
 ```
 
-- [ ] **Step 5: Lancer les tests**
+- [ ] **Step 5: Run the tests**
 
 ```bash
 pnpm --filter @vitrine/core test
@@ -1223,44 +1223,44 @@ git commit -m "feat(core/crypto): add argon2id api key hashing"
 
 ## Phase C — Pure logic core (M1)
 
-### Task C.1 — IDs ULID préfixés
+### Task C.1 — Prefixed ULID IDs
 
 **Files:**
 - Create: `packages/core/src/ids.ts`, `packages/core/tests/ids.test.ts`
 - Modify: `packages/core/src/index.ts`
 
-- [ ] **Step 1: Écrire le test**
+- [ ] **Step 1: Write the test**
 
-`packages/core/tests/ids.test.ts` :
+`packages/core/tests/ids.test.ts`:
 
 ```typescript
 import { describe, it, expect } from 'vitest'
 import { newId, isId } from '../src/ids'
 
 describe('ids', () => {
-  it("génère un id avec le bon préfixe", () => {
+  it("generates an id with the right prefix", () => {
     const id = newId('evt')
     expect(id).toMatch(/^evt_[0-9A-HJKMNP-TV-Z]{26}$/)
   })
 
-  it('isId accepte un id valide', () => {
+  it('isId accepts a valid id', () => {
     const id = newId('cl')
     expect(isId(id, 'cl')).toBe(true)
   })
 
-  it('isId rejette un préfixe différent', () => {
+  it('isId rejects a different prefix', () => {
     const id = newId('cl')
     expect(isId(id, 'ep')).toBe(false)
   })
 
-  it('isId rejette un format ULID invalide', () => {
+  it('isId rejects an invalid ULID format', () => {
     expect(isId('cl_short', 'cl')).toBe(false)
     expect(isId('cl_lowercase01HZxxxxxxxxxxxxxxxxxxxx', 'cl')).toBe(false)
   })
 })
 ```
 
-- [ ] **Step 2: Lancer pour fail**
+- [ ] **Step 2: Run to confirm failure**
 
 ```bash
 pnpm --filter @vitrine/core test
@@ -1268,7 +1268,7 @@ pnpm --filter @vitrine/core test
 
 Expected: FAIL — `ids` module not found.
 
-- [ ] **Step 3: Implémenter `packages/core/src/ids.ts`**
+- [ ] **Step 3: Implement `packages/core/src/ids.ts`**
 
 ```typescript
 import { ulid } from 'ulid'
@@ -1289,16 +1289,16 @@ export function isId<P extends IdPrefix>(value: unknown, prefix: P): value is `$
 }
 ```
 
-- [ ] **Step 4: Exporter depuis `packages/core/src/index.ts`**
+- [ ] **Step 4: Export from `packages/core/src/index.ts`**
 
-Remplacer le fichier par :
+Replace the file with:
 
 ```typescript
 export * from './ids'
 export * from './crypto'
 ```
 
-- [ ] **Step 5: Lancer les tests**
+- [ ] **Step 5: Run the tests**
 
 ```bash
 pnpm --filter @vitrine/core test
@@ -1315,26 +1315,26 @@ git commit -m "feat(core): add ULID-based prefixed ids"
 
 ---
 
-### Task C.2 — Backoff avec jitter (TDD)
+### Task C.2 — Backoff with jitter (TDD)
 
 **Files:**
 - Create: `packages/core/src/retry/backoff.ts`, `packages/core/src/retry/index.ts`, `packages/core/tests/retry/backoff.test.ts`
 
-- [ ] **Step 1: Écrire le test**
+- [ ] **Step 1: Write the test**
 
-`packages/core/tests/retry/backoff.test.ts` :
+`packages/core/tests/retry/backoff.test.ts`:
 
 ```typescript
 import { describe, it, expect } from 'vitest'
 import { backoffMs, RETRY_SCHEDULE_MS } from '../../src/retry/backoff'
 
 describe('backoffMs', () => {
-  it('retourne 0 pour la première tentative', () => {
+  it('returns 0 for the first attempt', () => {
     expect(backoffMs(1, () => 0.5)).toBe(0)
   })
 
-  it('respecte le schedule pour les attempts 2-7', () => {
-    const noJitter = () => 0.5 // (0.8 + 0.5*0.4) = 1.0 → pas de jitter
+  it('follows the schedule for attempts 2-7', () => {
+    const noJitter = () => 0.5 // (0.8 + 0.5*0.4) = 1.0 → no jitter
     expect(backoffMs(2, noJitter)).toBe(1_000)
     expect(backoffMs(3, noJitter)).toBe(10_000)
     expect(backoffMs(4, noJitter)).toBe(60_000)
@@ -1343,36 +1343,36 @@ describe('backoffMs', () => {
     expect(backoffMs(7, noJitter)).toBe(21_600_000)
   })
 
-  it('applique un jitter de ±20% multiplicatif', () => {
+  it('applies a multiplicative ±20% jitter', () => {
     const minJitter = () => 0 // 0.8x
     const maxJitter = () => 1 // 1.2x
     expect(backoffMs(2, minJitter)).toBe(800)
     expect(backoffMs(2, maxJitter)).toBe(1_200)
   })
 
-  it('throws pour attempt >= 8 (au-delà du schedule)', () => {
+  it('throws for attempt >= 8 (beyond the schedule)', () => {
     expect(() => backoffMs(8)).toThrow(/out of schedule/)
   })
 
-  it('throws pour attempt <= 0', () => {
+  it('throws for attempt <= 0', () => {
     expect(() => backoffMs(0)).toThrow()
   })
 
-  it('expose la table RETRY_SCHEDULE_MS', () => {
+  it('exposes the RETRY_SCHEDULE_MS table', () => {
     expect(RETRY_SCHEDULE_MS).toEqual([0, 1_000, 10_000, 60_000, 600_000, 3_600_000, 21_600_000])
   })
 })
 ```
 
-- [ ] **Step 2: Lancer pour fail**
+- [ ] **Step 2: Run to confirm failure**
 
 ```bash
 pnpm --filter @vitrine/core test
 ```
 
-Expected: FAIL — module non trouvé.
+Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implémenter `packages/core/src/retry/backoff.ts`**
+- [ ] **Step 3: Implement `packages/core/src/retry/backoff.ts`**
 
 ```typescript
 export const RETRY_SCHEDULE_MS = [
@@ -1398,13 +1398,13 @@ export function backoffMs(attempt: number, rng: () => number = Math.random): num
 }
 ```
 
-- [ ] **Step 4: Créer `packages/core/src/retry/index.ts`**
+- [ ] **Step 4: Create `packages/core/src/retry/index.ts`**
 
 ```typescript
 export * from './backoff'
 ```
 
-- [ ] **Step 5: Mettre à jour `packages/core/src/index.ts`**
+- [ ] **Step 5: Update `packages/core/src/index.ts`**
 
 ```typescript
 export * from './ids'
@@ -1412,13 +1412,13 @@ export * from './crypto'
 export * from './retry'
 ```
 
-- [ ] **Step 6: Lancer les tests**
+- [ ] **Step 6: Run the tests**
 
 ```bash
 pnpm --filter @vitrine/core test
 ```
 
-Expected: PASS, 6 nouveaux tests.
+Expected: PASS, 6 new tests.
 
 - [ ] **Step 7: Commit**
 
@@ -1435,9 +1435,9 @@ git commit -m "feat(core/retry): add exponential backoff with ±20% jitter"
 - Create: `packages/core/src/retry/classify.ts`, `packages/core/tests/retry/classify.test.ts`
 - Modify: `packages/core/src/retry/index.ts`
 
-- [ ] **Step 1: Écrire le test**
+- [ ] **Step 1: Write the test**
 
-`packages/core/tests/retry/classify.test.ts` :
+`packages/core/tests/retry/classify.test.ts`:
 
 ```typescript
 import { describe, it, expect } from 'vitest'
@@ -1473,7 +1473,7 @@ describe('classifyOutcome', () => {
       .toEqual<Outcome>({ kind: 'throttle', retryAfterRaw: '30' })
   })
 
-  it('429 sans Retry-After → throttle avec retryAfterRaw null', () => {
+  it('429 without Retry-After → throttle with retryAfterRaw null', () => {
     expect(classifyOutcome({ kind: 'response', statusCode: 429 }))
       .toEqual<Outcome>({ kind: 'throttle', retryAfterRaw: null })
   })
@@ -1490,7 +1490,7 @@ describe('classifyOutcome', () => {
 })
 ```
 
-- [ ] **Step 2: Lancer pour fail**
+- [ ] **Step 2: Run to confirm failure**
 
 ```bash
 pnpm --filter @vitrine/core test
@@ -1498,7 +1498,7 @@ pnpm --filter @vitrine/core test
 
 Expected: FAIL.
 
-- [ ] **Step 3: Implémenter `packages/core/src/retry/classify.ts`**
+- [ ] **Step 3: Implement `packages/core/src/retry/classify.ts`**
 
 ```typescript
 export type Outcome =
@@ -1528,20 +1528,20 @@ export function classifyOutcome(input: Input): Outcome {
 }
 ```
 
-- [ ] **Step 4: Mettre à jour `packages/core/src/retry/index.ts`**
+- [ ] **Step 4: Update `packages/core/src/retry/index.ts`**
 
 ```typescript
 export * from './backoff'
 export * from './classify'
 ```
 
-- [ ] **Step 5: Lancer les tests**
+- [ ] **Step 5: Run the tests**
 
 ```bash
 pnpm --filter @vitrine/core test
 ```
 
-Expected: 10 nouveaux tests pass.
+Expected: 10 new tests pass.
 
 - [ ] **Step 6: Commit**
 
@@ -1558,9 +1558,9 @@ git commit -m "feat(core/retry): classify HTTP outcome and undici errors"
 - Create: `packages/core/src/retry/retry-after.ts`, `packages/core/tests/retry/retry-after.test.ts`
 - Modify: `packages/core/src/retry/index.ts`
 
-- [ ] **Step 1: Écrire le test**
+- [ ] **Step 1: Write the test**
 
-`packages/core/tests/retry/retry-after.test.ts` :
+`packages/core/tests/retry/retry-after.test.ts`:
 
 ```typescript
 import { describe, it, expect } from 'vitest'
@@ -1570,39 +1570,39 @@ describe('parseRetryAfter', () => {
   const now = new Date('2026-05-09T10:00:00Z').getTime()
   const MAX = 6 * 3600 * 1000
 
-  it('null si header absent', () => {
+  it('null if header missing', () => {
     expect(parseRetryAfter(null, now, MAX)).toBe(null)
   })
 
-  it('valeur numérique en secondes', () => {
+  it('numeric value in seconds', () => {
     expect(parseRetryAfter('30', now, MAX)).toBe(30_000)
   })
 
-  it('rejette les valeurs négatives', () => {
+  it('rejects negative values', () => {
     expect(parseRetryAfter('-5', now, MAX)).toBe(null)
   })
 
-  it('rejette les valeurs au-delà du max', () => {
+  it('rejects values beyond the max', () => {
     expect(parseRetryAfter(String(7 * 3600), now, MAX)).toBe(null)
   })
 
-  it('parse une date HTTP au format RFC 7231', () => {
+  it('parses an HTTP date in RFC 7231 format', () => {
     const future = 'Sat, 09 May 2026 10:00:30 GMT'
     expect(parseRetryAfter(future, now, MAX)).toBe(30_000)
   })
 
-  it('rejette une date dans le passé', () => {
+  it('rejects a date in the past', () => {
     const past = 'Sat, 09 May 2026 09:59:00 GMT'
     expect(parseRetryAfter(past, now, MAX)).toBe(null)
   })
 
-  it('rejette une string non parseable', () => {
+  it('rejects an unparseable string', () => {
     expect(parseRetryAfter('abc', now, MAX)).toBe(null)
   })
 })
 ```
 
-- [ ] **Step 2: Lancer pour fail**
+- [ ] **Step 2: Run to confirm failure**
 
 ```bash
 pnpm --filter @vitrine/core test
@@ -1610,7 +1610,7 @@ pnpm --filter @vitrine/core test
 
 Expected: FAIL.
 
-- [ ] **Step 3: Implémenter `packages/core/src/retry/retry-after.ts`**
+- [ ] **Step 3: Implement `packages/core/src/retry/retry-after.ts`**
 
 ```typescript
 export function parseRetryAfter(header: string | null, nowMs: number, maxMs: number): number | null {
@@ -1631,7 +1631,7 @@ export function parseRetryAfter(header: string | null, nowMs: number, maxMs: num
 }
 ```
 
-- [ ] **Step 4: Mettre à jour `packages/core/src/retry/index.ts`**
+- [ ] **Step 4: Update `packages/core/src/retry/index.ts`**
 
 ```typescript
 export * from './backoff'
@@ -1639,13 +1639,13 @@ export * from './classify'
 export * from './retry-after'
 ```
 
-- [ ] **Step 5: Lancer les tests**
+- [ ] **Step 5: Run the tests**
 
 ```bash
 pnpm --filter @vitrine/core test
 ```
 
-Expected: 7 nouveaux tests pass.
+Expected: 7 new tests pass.
 
 - [ ] **Step 6: Commit**
 
@@ -1662,31 +1662,31 @@ git commit -m "feat(core/retry): parse Retry-After header (delay or HTTP date)"
 - Create: `packages/core/src/idempotency.ts`, `packages/core/tests/idempotency.test.ts`
 - Modify: `packages/core/src/index.ts`
 
-- [ ] **Step 1: Écrire le test**
+- [ ] **Step 1: Write the test**
 
-`packages/core/tests/idempotency.test.ts` :
+`packages/core/tests/idempotency.test.ts`:
 
 ```typescript
 import { describe, it, expect } from 'vitest'
 import { sha256Hex, idempotencyDecide } from '../src/idempotency'
 
 describe('sha256Hex', () => {
-  it('stable pour le même input', () => {
+  it('stable for the same input', () => {
     const input = JSON.stringify({ a: 1, b: 2 })
     expect(sha256Hex(input)).toBe(sha256Hex(input))
   })
 
-  it('hash différent pour des inputs différents', () => {
+  it('different hash for different inputs', () => {
     expect(sha256Hex('a')).not.toBe(sha256Hex('b'))
   })
 })
 
 describe('idempotencyDecide', () => {
-  it('absent → fresh, on doit créer un nouvel event', () => {
+  it('absent → fresh, we must create a new event', () => {
     expect(idempotencyDecide({ stored: null, incomingHash: 'h1' })).toEqual({ kind: 'fresh' })
   })
 
-  it('stored avec même hash → existing, return event_id', () => {
+  it('stored with same hash → existing, return event_id', () => {
     expect(
       idempotencyDecide({
         stored: { eventId: 'evt_x', payloadSha256: 'h1' },
@@ -1695,7 +1695,7 @@ describe('idempotencyDecide', () => {
     ).toEqual({ kind: 'existing', eventId: 'evt_x' })
   })
 
-  it('stored avec hash différent → conflict', () => {
+  it('stored with different hash → conflict', () => {
     expect(
       idempotencyDecide({
         stored: { eventId: 'evt_x', payloadSha256: 'h1' },
@@ -1706,7 +1706,7 @@ describe('idempotencyDecide', () => {
 })
 ```
 
-- [ ] **Step 2: Lancer pour fail**
+- [ ] **Step 2: Run to confirm failure**
 
 ```bash
 pnpm --filter @vitrine/core test
@@ -1714,7 +1714,7 @@ pnpm --filter @vitrine/core test
 
 Expected: FAIL.
 
-- [ ] **Step 3: Implémenter `packages/core/src/idempotency.ts`**
+- [ ] **Step 3: Implement `packages/core/src/idempotency.ts`**
 
 ```typescript
 import { createHash } from 'node:crypto'
@@ -1745,7 +1745,7 @@ export function idempotencyDecide(params: {
 }
 ```
 
-- [ ] **Step 4: Mettre à jour `packages/core/src/index.ts`**
+- [ ] **Step 4: Update `packages/core/src/index.ts`**
 
 ```typescript
 export * from './ids'
@@ -1754,13 +1754,13 @@ export * from './retry'
 export * from './idempotency'
 ```
 
-- [ ] **Step 5: Lancer les tests**
+- [ ] **Step 5: Run the tests**
 
 ```bash
 pnpm --filter @vitrine/core test
 ```
 
-Expected: 5 nouveaux tests pass.
+Expected: 5 new tests pass.
 
 - [ ] **Step 6: Commit**
 
@@ -1771,15 +1771,15 @@ git commit -m "feat(core): add idempotency decide and sha256Hex"
 
 ---
 
-### Task C.6 — Breaker FSM transition function (TDD avec table de vérité)
+### Task C.6 — Breaker FSM transition function (TDD with truth table)
 
 **Files:**
 - Create: `packages/core/src/breaker/fsm.ts`, `packages/core/src/breaker/index.ts`, `packages/core/tests/breaker/fsm.test.ts`
 - Modify: `packages/core/src/index.ts`
 
-- [ ] **Step 1: Écrire le test**
+- [ ] **Step 1: Write the test**
 
-`packages/core/tests/breaker/fsm.test.ts` :
+`packages/core/tests/breaker/fsm.test.ts`:
 
 ```typescript
 import { describe, it, expect } from 'vitest'
@@ -1820,16 +1820,16 @@ describe('breaker FSM transition', () => {
     expect(transition(closed(2), 'failure', NOW)).toEqual(closed(3))
   })
 
-  it('closed + 5e failure consécutif → open (30s)', () => {
+  it('closed + 5th consecutive failure → open (30s)', () => {
     expect(transition(closed(4), 'failure', NOW)).toEqual(open(INITIAL_OPEN_MS, NOW))
   })
 
-  it('open avant TTL + read → reste open (lazy)', () => {
+  it('open before TTL + read → stays open (lazy)', () => {
     const s = open(INITIAL_OPEN_MS, NOW - 10_000)
     expect(transition(s, 'read', NOW)).toEqual(s)
   })
 
-  it('open après TTL + read → half_open (lazy)', () => {
+  it('open after TTL + read → half_open (lazy)', () => {
     const s = open(INITIAL_OPEN_MS, NOW - INITIAL_OPEN_MS - 1)
     expect(transition(s, 'read', NOW)).toEqual(halfOpen(INITIAL_OPEN_MS))
   })
@@ -1838,29 +1838,29 @@ describe('breaker FSM transition', () => {
     expect(transition(halfOpen(120_000), 'success', NOW)).toEqual(closed(0))
   })
 
-  it('half_open + failure (probe) → open (duration doublée)', () => {
+  it('half_open + failure (probe) → open (duration doubled)', () => {
     expect(transition(halfOpen(60_000), 'failure', NOW)).toEqual(open(120_000, NOW))
   })
 
-  it('half_open + failure plafonné à 30 min', () => {
+  it('half_open + failure capped at 30 min', () => {
     expect(transition(halfOpen(20 * 60_000), 'failure', NOW)).toEqual(open(MAX_OPEN_MS, NOW))
   })
 
-  it('open + success (impossible normalement, défensif) → closed', () => {
-    // Cas défensif : si jamais une success arrive en open avant TTL, on close.
-    // Cela ne doit pas arriver car le worker moveToDelayed avant.
+  it('open + success (normally impossible, defensive) → closed', () => {
+    // Defensive case: if a success ever arrives while open before TTL, we close.
+    // This should not happen because the worker does moveToDelayed beforehand.
     expect(transition(open(INITIAL_OPEN_MS, NOW - 1000), 'success', NOW).state).toBe('closed')
   })
 
-  it('open + failure (avant TTL) → reste open avec compteur réinitialisé', () => {
-    // Cas défensif : un échec qui arriverait quand même en open (race). On garde l'état.
+  it('open + failure (before TTL) → stays open with counter reset', () => {
+    // Defensive case: a failure that still arrives while open (race). We keep the state.
     const s = open(INITIAL_OPEN_MS, NOW - 1000)
     expect(transition(s, 'failure', NOW)).toEqual(s)
   })
 })
 ```
 
-- [ ] **Step 2: Lancer pour fail**
+- [ ] **Step 2: Run to confirm failure**
 
 ```bash
 pnpm --filter @vitrine/core test
@@ -1868,7 +1868,7 @@ pnpm --filter @vitrine/core test
 
 Expected: FAIL.
 
-- [ ] **Step 3: Implémenter `packages/core/src/breaker/fsm.ts`**
+- [ ] **Step 3: Implement `packages/core/src/breaker/fsm.ts`**
 
 ```typescript
 export type BreakerStateName = 'closed' | 'open' | 'half_open'
@@ -1942,13 +1942,13 @@ export function transition(state: BreakerState, event: BreakerEvent, nowMs: numb
 }
 ```
 
-- [ ] **Step 4: Créer `packages/core/src/breaker/index.ts`**
+- [ ] **Step 4: Create `packages/core/src/breaker/index.ts`**
 
 ```typescript
 export * from './fsm'
 ```
 
-- [ ] **Step 5: Mettre à jour `packages/core/src/index.ts`**
+- [ ] **Step 5: Update `packages/core/src/index.ts`**
 
 ```typescript
 export * from './ids'
@@ -1958,13 +1958,13 @@ export * from './idempotency'
 export * from './breaker'
 ```
 
-- [ ] **Step 6: Lancer les tests**
+- [ ] **Step 6: Run the tests**
 
 ```bash
 pnpm --filter @vitrine/core test
 ```
 
-Expected: 10 nouveaux tests pass.
+Expected: 10 new tests pass.
 
 - [ ] **Step 7: Commit**
 
@@ -1975,51 +1975,51 @@ git commit -m "feat(core/breaker): add pure FSM transition function"
 
 ---
 
-### Task C.7 — Zod schemas (types métier)
+### Task C.7 — Zod schemas (domain types)
 
 **Files:**
 - Create: `packages/core/src/types.ts`, `packages/core/tests/types.test.ts`
 - Modify: `packages/core/src/index.ts`
 
-- [ ] **Step 1: Écrire le test**
+- [ ] **Step 1: Write the test**
 
-`packages/core/tests/types.test.ts` :
+`packages/core/tests/types.test.ts`:
 
 ```typescript
 import { describe, it, expect } from 'vitest'
 import { CreateEndpointSchema, IngestEventSchema, EventTypeSchema, EndpointIdSchema } from '../src/types'
 
 describe('Zod schemas', () => {
-  it('EventTypeSchema accepte order.shipped', () => {
+  it('EventTypeSchema accepts order.shipped', () => {
     expect(EventTypeSchema.parse('order.shipped')).toBe('order.shipped')
   })
 
-  it('EventTypeSchema rejette MAJUSCULE', () => {
+  it('EventTypeSchema rejects UPPERCASE', () => {
     expect(() => EventTypeSchema.parse('Order.Shipped')).toThrow()
   })
 
-  it('EventTypeSchema rejette les espaces', () => {
+  it('EventTypeSchema rejects spaces', () => {
     expect(() => EventTypeSchema.parse('order shipped')).toThrow()
   })
 
-  it('EndpointIdSchema accepte un id valide', () => {
+  it('EndpointIdSchema accepts a valid id', () => {
     expect(EndpointIdSchema.parse('ep_01HZA1B2C3D4E5F6G7H8J9K0M1')).toBe('ep_01HZA1B2C3D4E5F6G7H8J9K0M1')
   })
 
-  it('EndpointIdSchema rejette préfixe différent', () => {
+  it('EndpointIdSchema rejects a different prefix', () => {
     expect(() => EndpointIdSchema.parse('cl_01HZA1B2C3D4E5F6G7H8J9K0M1')).toThrow()
   })
 
-  it('CreateEndpointSchema accepte url HTTPS', () => {
+  it('CreateEndpointSchema accepts an HTTPS url', () => {
     const result = CreateEndpointSchema.parse({ url: 'https://example.com/hook' })
     expect(result.url).toBe('https://example.com/hook')
   })
 
-  it('CreateEndpointSchema rejette url HTTP plain', () => {
+  it('CreateEndpointSchema rejects a plain HTTP url', () => {
     expect(() => CreateEndpointSchema.parse({ url: 'http://example.com/hook' })).toThrow(/https/)
   })
 
-  it('IngestEventSchema valide un payload complet', () => {
+  it('IngestEventSchema validates a complete payload', () => {
     const valid = {
       endpoint_id: 'ep_01HZA1B2C3D4E5F6G7H8J9K0M1',
       event_type: 'order.shipped',
@@ -2030,7 +2030,7 @@ describe('Zod schemas', () => {
 })
 ```
 
-- [ ] **Step 2: Lancer pour fail**
+- [ ] **Step 2: Run to confirm failure**
 
 ```bash
 pnpm --filter @vitrine/core test
@@ -2038,7 +2038,7 @@ pnpm --filter @vitrine/core test
 
 Expected: FAIL.
 
-- [ ] **Step 3: Implémenter `packages/core/src/types.ts`**
+- [ ] **Step 3: Implement `packages/core/src/types.ts`**
 
 ```typescript
 import { z } from 'zod'
@@ -2079,7 +2079,7 @@ export const EventStatusSchema = z.enum(['pending', 'delivered', 'dead'])
 export type EventStatus = z.infer<typeof EventStatusSchema>
 ```
 
-- [ ] **Step 4: Exporter depuis `packages/core/src/index.ts`**
+- [ ] **Step 4: Export from `packages/core/src/index.ts`**
 
 ```typescript
 export * from './ids'
@@ -2090,13 +2090,13 @@ export * from './breaker'
 export * from './types'
 ```
 
-- [ ] **Step 5: Lancer les tests**
+- [ ] **Step 5: Run the tests**
 
 ```bash
 pnpm --filter @vitrine/core test
 ```
 
-Expected: 8 nouveaux tests pass. **Tous les tests core passent (~50).**
+Expected: 8 new tests pass. **All core tests pass (~50).**
 
 - [ ] **Step 6: Commit**
 
@@ -2114,7 +2114,7 @@ git commit -m "feat(core): add zod schemas for ids, endpoint creation, event ing
 **Files:**
 - Create: `packages/queue/src/redis.ts`
 
-- [ ] **Step 1: Implémenter**
+- [ ] **Step 1: Implement**
 
 ```typescript
 import { Redis, type RedisOptions } from 'ioredis'
@@ -2129,7 +2129,7 @@ export function createRedisClient(url: string, opts: Partial<RedisOptions> = {})
 }
 ```
 
-- [ ] **Step 2: Exporter depuis `packages/queue/src/index.ts`**
+- [ ] **Step 2: Export from `packages/queue/src/index.ts`**
 
 ```typescript
 export * from './redis'
@@ -2152,15 +2152,15 @@ git commit -m "feat(queue): add ioredis client factory"
 
 ---
 
-### Task D.2 — record_outcome.lua + loader (TDD avec Testcontainers Redis)
+### Task D.2 — record_outcome.lua + loader (TDD with Testcontainers Redis)
 
 **Files:**
 - Create: `packages/queue/src/lua/record_outcome.lua`, `packages/queue/src/breaker.ts`, `packages/queue/tests/breaker.test.ts`
 - Modify: `packages/queue/src/index.ts`
 
-- [ ] **Step 1: Écrire le Lua script**
+- [ ] **Step 1: Write the Lua script**
 
-`packages/queue/src/lua/record_outcome.lua` :
+`packages/queue/src/lua/record_outcome.lua`:
 
 ```lua
 -- KEYS[1] : breaker:{endpoint_id}
@@ -2231,9 +2231,9 @@ redis.call('SET', KEYS[1], encoded, 'EX', ttl)
 return encoded
 ```
 
-- [ ] **Step 2: Écrire le test**
+- [ ] **Step 2: Write the test**
 
-`packages/queue/tests/breaker.test.ts` :
+`packages/queue/tests/breaker.test.ts`:
 
 ```typescript
 import { afterAll, beforeAll, describe, it, expect } from 'vitest'
@@ -2255,13 +2255,13 @@ describe('record_outcome.lua', () => {
     await container?.stop()
   })
 
-  it('démarre en closed avec failCount=0 (read sur clé absente)', async () => {
+  it('starts closed with failCount=0 (read on missing key)', async () => {
     const r = await recordOutcome(redis, 'ep_test1', 'read', Date.now())
     expect(r.state).toBe('closed')
     expect(r.failCount).toBe(0)
   })
 
-  it('5 failures consécutifs → open', async () => {
+  it('5 consecutive failures → open', async () => {
     const ep = 'ep_test2'
     for (let i = 0; i < 4; i++) {
       const r = await recordOutcome(redis, ep, 'failure', Date.now())
@@ -2273,7 +2273,7 @@ describe('record_outcome.lua', () => {
     expect(final.openDurationMs).toBe(30_000)
   })
 
-  it('open expire → half_open puis success → closed', async () => {
+  it('open expires → half_open then success → closed', async () => {
     const ep = 'ep_test3'
     for (let i = 0; i < 5; i++) await recordOutcome(redis, ep, 'failure', 1_000_000)
     // simulate now > openedAt + 30s
@@ -2283,7 +2283,7 @@ describe('record_outcome.lua', () => {
     expect(closed.state).toBe('closed')
   })
 
-  it('half_open + failure → open avec duration doublée', async () => {
+  it('half_open + failure → open with doubled duration', async () => {
     const ep = 'ep_test4'
     for (let i = 0; i < 5; i++) await recordOutcome(redis, ep, 'failure', 2_000_000)
     await recordOutcome(redis, ep, 'read', 2_000_000 + 31_000) // → half_open
@@ -2294,7 +2294,7 @@ describe('record_outcome.lua', () => {
 })
 ```
 
-- [ ] **Step 3: Lancer pour fail**
+- [ ] **Step 3: Run to confirm failure**
 
 ```bash
 pnpm --filter @vitrine/queue test
@@ -2302,7 +2302,7 @@ pnpm --filter @vitrine/queue test
 
 Expected: FAIL — `breaker` module not found.
 
-- [ ] **Step 4: Implémenter `packages/queue/src/breaker.ts`**
+- [ ] **Step 4: Implement `packages/queue/src/breaker.ts`**
 
 ```typescript
 import { readFileSync } from 'node:fs'
@@ -2355,22 +2355,22 @@ export async function recordOutcome(
 }
 ```
 
-- [ ] **Step 5: Mettre à jour `packages/queue/src/index.ts`**
+- [ ] **Step 5: Update `packages/queue/src/index.ts`**
 
 ```typescript
 export * from './redis'
 export * from './breaker'
 ```
 
-- [ ] **Step 6: Mettre à jour `packages/queue/tsconfig.json`** pour copier le .lua dans le bundle (pas critique pour tests qui lisent depuis src) — vérifier que `readFileSync` trouve le fichier en dev.
+- [ ] **Step 6: Update `packages/queue/tsconfig.json`** to copy the .lua into the bundle (not critical for tests, which read from src) — check that `readFileSync` finds the file in dev.
 
-- [ ] **Step 7: Lancer les tests**
+- [ ] **Step 7: Run the tests**
 
 ```bash
 pnpm --filter @vitrine/queue test
 ```
 
-Expected: 4 tests pass. (Premier lancement long : pull image Redis ~30s.)
+Expected: 4 tests pass. (First run is slow: Redis image pull ~30s.)
 
 - [ ] **Step 8: Commit**
 
@@ -2387,9 +2387,9 @@ git commit -m "feat(queue): add atomic record_outcome lua script and breaker wra
 - Create: `packages/queue/src/delivery-queue.ts`
 - Modify: `packages/queue/src/index.ts`
 
-- [ ] **Step 1: Implémenter**
+- [ ] **Step 1: Implement**
 
-`packages/queue/src/delivery-queue.ts` :
+`packages/queue/src/delivery-queue.ts`:
 
 ```typescript
 import { Queue, type ConnectionOptions, type WorkerOptions } from 'bullmq'
@@ -2427,7 +2427,7 @@ export function workerSettings(): WorkerOptions['settings'] {
 }
 ```
 
-- [ ] **Step 2: Mettre à jour `packages/queue/src/index.ts`**
+- [ ] **Step 2: Update `packages/queue/src/index.ts`**
 
 ```typescript
 export * from './redis'
@@ -2459,7 +2459,7 @@ git commit -m "feat(queue): add delivery queue factory and custom backoff strate
 **Files:**
 - Create: `packages/test-helpers/src/containers.ts`
 
-- [ ] **Step 1: Implémenter**
+- [ ] **Step 1: Implement**
 
 ```typescript
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
@@ -2504,19 +2504,19 @@ export async function startInfra(): Promise<StartedInfra> {
 }
 ```
 
-- [ ] **Step 2: Exporter depuis `packages/test-helpers/src/index.ts`**
+- [ ] **Step 2: Export from `packages/test-helpers/src/index.ts`**
 
 ```typescript
 export * from './containers'
 ```
 
-- [ ] **Step 3: Vérifier la migration a un fichier dédié**
+- [ ] **Step 3: Check the migration has a dedicated file**
 
 ```bash
 ls packages/db/drizzle/*.sql
 ```
 
-Expected: au moins un `0000_*.sql`. (Sinon, run `pnpm db:generate`.)
+Expected: at least one `0000_*.sql`. (Otherwise, run `pnpm db:generate`.)
 
 - [ ] **Step 4: Typecheck**
 
@@ -2535,13 +2535,13 @@ git commit -m "feat(test-helpers): add postgres + redis testcontainers fixture"
 
 ---
 
-### Task E.2 — Fake endpoint harness configurable
+### Task E.2 — Configurable fake endpoint harness
 
 **Files:**
 - Create: `packages/test-helpers/src/fake-endpoint.ts`
 - Modify: `packages/test-helpers/src/index.ts`
 
-- [ ] **Step 1: Implémenter**
+- [ ] **Step 1: Implement**
 
 ```typescript
 import Fastify, { type FastifyInstance } from 'fastify'
@@ -2608,7 +2608,7 @@ export async function startFakeEndpoint(): Promise<FakeEndpoint> {
 }
 ```
 
-- [ ] **Step 2: Mettre à jour l'index**
+- [ ] **Step 2: Update the index**
 
 ```typescript
 export * from './containers'
@@ -2632,13 +2632,13 @@ git commit -m "feat(test-helpers): add configurable fake endpoint harness"
 
 ---
 
-### Task E.3 — Seed + app fixture (build API + Worker pour tests)
+### Task E.3 — Seed + app fixture (build API + Worker for tests)
 
 **Files:**
 - Create: `packages/test-helpers/src/seed.ts`, `packages/test-helpers/src/app-fixture.ts`
 - Modify: `packages/test-helpers/src/index.ts`
 
-- [ ] **Step 1: Implémenter `seed.ts`**
+- [ ] **Step 1: Implement `seed.ts`**
 
 ```typescript
 import { newId, hashApiKey, encryptSecret } from '@vitrine/core'
@@ -2670,7 +2670,7 @@ export async function seedEndpoint(
 }
 ```
 
-- [ ] **Step 2: Implémenter `app-fixture.ts`**
+- [ ] **Step 2: Implement `app-fixture.ts`**
 
 ```typescript
 import { buildApp } from '../../../apps/api/src/server'
@@ -2729,9 +2729,9 @@ export async function startApp(opts: {
 }
 ```
 
-NOTE: `buildApp` et `startWorker` n'existent pas encore avec ces signatures. Cette fonction sera consommée par les tests d'intégration (Phase H), donc le typecheck va échouer ici jusqu'à ce que les tasks F.1 et G.1 mettent à jour les signatures. Pour ce task, on définit l'interface attendue. Le typecheck du package se fera après F.1 et G.1.
+NOTE: `buildApp` and `startWorker` don't exist yet with these signatures. This function will be consumed by the integration tests (Phase H), so the typecheck will fail here until tasks F.1 and G.1 update the signatures. For this task, we define the expected interface. The package typecheck will be done after F.1 and G.1.
 
-- [ ] **Step 3: Mettre à jour l'index**
+- [ ] **Step 3: Update the index**
 
 ```typescript
 export * from './containers'
@@ -2751,13 +2751,13 @@ git commit -m "feat(test-helpers): add seed helpers and app+worker fixture"
 
 ## Phase F — API HTTP (M2)
 
-### Task F.1 — Fastify scaffold avec config injectable
+### Task F.1 — Fastify scaffold with injectable config
 
 **Files:**
 - Modify: `apps/api/src/server.ts`
 - Create: `apps/api/src/plugins/config.ts`
 
-- [ ] **Step 1: Créer `apps/api/src/plugins/config.ts`**
+- [ ] **Step 1: Create `apps/api/src/plugins/config.ts`**
 
 ```typescript
 import fp from 'fastify-plugin'
@@ -2798,7 +2798,7 @@ export const configPlugin = fp<{ config: AppConfig }>(async (app, opts) => {
 })
 ```
 
-- [ ] **Step 2: Réécrire `apps/api/src/server.ts`**
+- [ ] **Step 2: Rewrite `apps/api/src/server.ts`**
 
 ```typescript
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify'
@@ -2820,7 +2820,7 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   await app.register(configPlugin, { config })
 
   app.get('/health', async () => ({ ok: true }))
-  app.get('/ready', async () => ({ ok: true })) // étoffé en task F.6
+  app.get('/ready', async () => ({ ok: true })) // fleshed out in task F.6
 
   return app
 }
@@ -2839,7 +2839,7 @@ pnpm --filter @vitrine/api typecheck
 
 Expected: pass.
 
-- [ ] **Step 4: Run dev pour smoke**
+- [ ] **Step 4: Run dev for a smoke test**
 
 ```bash
 docker compose up -d
@@ -2848,7 +2848,7 @@ sleep 2
 curl -s http://localhost:3000/health
 ```
 
-Expected: `{"ok":true}`. Tuer le process : `kill %1`.
+Expected: `{"ok":true}`. Kill the process: `kill %1`.
 
 - [ ] **Step 5: Commit**
 
@@ -2865,7 +2865,7 @@ git commit -m "feat(api): add fastify scaffold with injectable config"
 - Create: `apps/api/src/plugins/db.ts`, `apps/api/src/plugins/queue.ts`
 - Modify: `apps/api/src/server.ts`
 
-- [ ] **Step 1: Créer `apps/api/src/plugins/db.ts`**
+- [ ] **Step 1: Create `apps/api/src/plugins/db.ts`**
 
 ```typescript
 import fp from 'fastify-plugin'
@@ -2883,7 +2883,7 @@ export const dbPlugin = fp<{ db?: DbClient }>(async (app, opts) => {
 })
 ```
 
-- [ ] **Step 2: Créer `apps/api/src/plugins/queue.ts`**
+- [ ] **Step 2: Create `apps/api/src/plugins/queue.ts`**
 
 ```typescript
 import fp from 'fastify-plugin'
@@ -2912,9 +2912,9 @@ export const queuePlugin = fp<{ redis?: Redis }>(async (app, opts) => {
 })
 ```
 
-NOTE: `createDeliveryQueue` accepte une `ConnectionOptions` (signature BullMQ) qui peut être un objet `{ host, port }` OU une instance `IORedis`. Le code ci-dessus passe l'instance directement. Vérifier la signature dans le retour de Task D.3 et ajuster si besoin.
+NOTE: `createDeliveryQueue` accepts a `ConnectionOptions` (BullMQ signature), which can be a `{ host, port }` object OR an `IORedis` instance. The code above passes the instance directly. Check the signature in the output of Task D.3 and adjust if needed.
 
-- [ ] **Step 3: Mettre à jour `apps/api/src/server.ts`**
+- [ ] **Step 3: Update `apps/api/src/server.ts`**
 
 ```typescript
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify'
@@ -2985,9 +2985,9 @@ git commit -m "feat(api): add db and queue plugins"
 - Create: `apps/api/src/plugins/auth.ts`
 - Modify: `apps/api/src/server.ts`
 
-- [ ] **Step 1: Implémenter**
+- [ ] **Step 1: Implement**
 
-`apps/api/src/plugins/auth.ts` :
+`apps/api/src/plugins/auth.ts`:
 
 ```typescript
 import fp from 'fastify-plugin'
@@ -3026,11 +3026,11 @@ export const authPlugin = fp(async (app) => {
 })
 ```
 
-NOTE V1 limitation: scan complet de la table `clients` à chaque requête. Acceptable pour la démo (≤10 clients). À optimiser en V2 avec un préfixe `cl_secret_<id_hint>_<rest>` permettant un lookup direct.
+NOTE V1 limitation: full scan of the `clients` table on every request. Acceptable for the demo (≤10 clients). To optimize in V2 with a `cl_secret_<id_hint>_<rest>` prefix allowing a direct lookup.
 
-- [ ] **Step 2: Enregistrer le plugin dans `apps/api/src/server.ts`**
+- [ ] **Step 2: Register the plugin in `apps/api/src/server.ts`**
 
-Ajouter après le `queuePlugin` :
+Add after the `queuePlugin`:
 
 ```typescript
 import { authPlugin } from './plugins/auth'
@@ -3061,9 +3061,9 @@ git commit -m "feat(api): add bearer auth plugin with argon2 verify"
 - Create: `apps/api/src/services/endpoints.ts`, `apps/api/src/routes/endpoints.ts`
 - Modify: `apps/api/src/server.ts`
 
-- [ ] **Step 1: Implémenter le service**
+- [ ] **Step 1: Implement the service**
 
-`apps/api/src/services/endpoints.ts` :
+`apps/api/src/services/endpoints.ts`:
 
 ```typescript
 import { randomBytes } from 'node:crypto'
@@ -3141,9 +3141,9 @@ export async function findEndpointForClient(
 }
 ```
 
-- [ ] **Step 2: Implémenter les routes**
+- [ ] **Step 2: Implement the routes**
 
-`apps/api/src/routes/endpoints.ts` :
+`apps/api/src/routes/endpoints.ts`:
 
 ```typescript
 import type { FastifyPluginAsync } from 'fastify'
@@ -3194,9 +3194,9 @@ export const endpointsRoutes: FastifyPluginAsync = async (app) => {
 }
 ```
 
-- [ ] **Step 3: Enregistrer les routes dans `apps/api/src/server.ts`**
+- [ ] **Step 3: Register the routes in `apps/api/src/server.ts`**
 
-Ajouter avant le retour :
+Add before the return:
 
 ```typescript
 import { endpointsRoutes } from './routes/endpoints'
@@ -3227,9 +3227,9 @@ git commit -m "feat(api): add endpoint CRUD service and routes"
 - Create: `apps/api/src/services/ingestion.ts`, `apps/api/src/routes/events.ts`
 - Modify: `apps/api/src/server.ts`
 
-- [ ] **Step 1: Implémenter le service**
+- [ ] **Step 1: Implement the service**
 
-`apps/api/src/services/ingestion.ts` :
+`apps/api/src/services/ingestion.ts`:
 
 ```typescript
 import type { Redis } from 'ioredis'
@@ -3290,9 +3290,9 @@ export async function ingestEvent(opts: {
 }
 ```
 
-- [ ] **Step 2: Implémenter la route**
+- [ ] **Step 2: Implement the route**
 
-`apps/api/src/routes/events.ts` :
+`apps/api/src/routes/events.ts`:
 
 ```typescript
 import type { FastifyPluginAsync } from 'fastify'
@@ -3420,9 +3420,9 @@ async function findEventDetail(db: DbClient, clientId: string, eventId: string) 
 }
 ```
 
-NOTE: la fonction `listEventsForClient` utilise un raw SQL simplifié. Pour la rendre safe contre l'injection, l'implementation finale doit utiliser le query builder de Drizzle ou des paramètres préparés. À refactoriser dans une task ultérieure si nécessaire ; le typecheck va probablement requérir un adapter Drizzle. Pour V1 minimaliste, cette ébauche montre la forme — l'engineer doit substituer par un `db.select().from(events).innerJoin(endpoints, ...).where(...)` quand il l'écrit.
+NOTE: the `listEventsForClient` function uses simplified raw SQL. To make it safe against injection, the final implementation must use Drizzle's query builder or prepared parameters. Refactor in a later task if needed; the typecheck will probably require a Drizzle adapter. For a minimal V1, this draft shows the shape — the engineer must substitute a `db.select().from(events).innerJoin(endpoints, ...).where(...)` when writing it.
 
-- [ ] **Step 3: Enregistrer dans server.ts**
+- [ ] **Step 3: Register in server.ts**
 
 ```typescript
 import { eventsRoutes } from './routes/events'
@@ -3436,7 +3436,7 @@ await app.register(eventsRoutes)
 pnpm --filter @vitrine/api typecheck
 ```
 
-Expected: pass (en remplaçant le raw SQL par une vraie query Drizzle si le typecheck échoue ; une implémentation correcte avec query builder est attendue).
+Expected: pass (replacing the raw SQL with a real Drizzle query if the typecheck fails; a correct implementation using the query builder is expected).
 
 - [ ] **Step 5: Commit**
 
@@ -3453,9 +3453,9 @@ git commit -m "feat(api): add events ingestion service and routes"
 - Create: `apps/api/src/services/replay.ts`, `apps/api/src/routes/replay.ts`
 - Modify: `apps/api/src/server.ts`
 
-- [ ] **Step 1: Implémenter le service**
+- [ ] **Step 1: Implement the service**
 
-`apps/api/src/services/replay.ts` :
+`apps/api/src/services/replay.ts`:
 
 ```typescript
 import type { Queue } from 'bullmq'
@@ -3473,7 +3473,7 @@ export async function replayEvent(opts: {
   clientId: string
   eventId: string
 }): Promise<ReplayResult> {
-  // Vérifier ownership: l'event appartient à un endpoint du client.
+  // Check ownership: the event belongs to one of the client's endpoints.
   const [row] = await opts.db
     .select({ event: events, endpoint: endpoints })
     .from(events)
@@ -3495,9 +3495,9 @@ export async function replayEvent(opts: {
 }
 ```
 
-- [ ] **Step 2: Implémenter la route**
+- [ ] **Step 2: Implement the route**
 
-`apps/api/src/routes/replay.ts` :
+`apps/api/src/routes/replay.ts`:
 
 ```typescript
 import type { FastifyPluginAsync } from 'fastify'
@@ -3519,7 +3519,7 @@ export const replayRoutes: FastifyPluginAsync = async (app) => {
 }
 ```
 
-- [ ] **Step 3: Enregistrer dans server.ts**
+- [ ] **Step 3: Register in server.ts**
 
 ```typescript
 import { replayRoutes } from './routes/replay'
@@ -3546,12 +3546,12 @@ git commit -m "feat(api): add replay route with ownership check"
 
 ## Phase G — Worker delivery (M3)
 
-### Task G.1 — HTTP client wrapper avec timeout + classify
+### Task G.1 — HTTP client wrapper with timeout + classify
 
 **Files:**
 - Create: `apps/worker/src/http-client.ts`
 
-- [ ] **Step 1: Implémenter**
+- [ ] **Step 1: Implement**
 
 ```typescript
 import { request } from 'undici'
@@ -3639,7 +3639,7 @@ git commit -m "feat(worker): add undici-based HTTP client with classify"
 **Files:**
 - Create: `apps/worker/src/deliver.ts`
 
-- [ ] **Step 1: Implémenter**
+- [ ] **Step 1: Implement**
 
 ```typescript
 import { eq, and, sql } from 'drizzle-orm'
@@ -3776,12 +3776,12 @@ git commit -m "feat(worker): add delivery orchestrator with breaker and retry cl
 
 ---
 
-### Task G.3 — Worker process avec BullMQ Worker
+### Task G.3 — Worker process with BullMQ Worker
 
 **Files:**
 - Modify: `apps/worker/src/worker.ts`
 
-- [ ] **Step 1: Réécrire `apps/worker/src/worker.ts`**
+- [ ] **Step 1: Rewrite `apps/worker/src/worker.ts`**
 
 ```typescript
 import { Worker, type ConnectionOptions } from 'bullmq'
@@ -3844,9 +3844,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 }
 ```
 
-NOTE: l'interaction entre `moveToDelayed` et `throw` est subtile. Dans BullMQ, si on appelle `moveToDelayed` et qu'ensuite on throw, le job est ré-enqueué avec le delay et l'attemptsMade n'avance pas. C'est ce qu'on veut pour le breaker_skip et pour le throttle override. Pour le DLQ terminal, on veut épuiser les tentatives — il faut donc que BullMQ ait `attempts: 7` configuré (cf. Task D.3) et que les retries normaux throw une erreur sans `moveToDelayed`. La logique ci-dessus respecte ça.
+NOTE: the interaction between `moveToDelayed` and `throw` is subtle. In BullMQ, if you call `moveToDelayed` and then throw, the job is re-enqueued with the delay and attemptsMade doesn't advance. That's what we want for breaker_skip and for the throttle override. For the terminal DLQ, we want to exhaust the attempts — so BullMQ must have `attempts: 7` configured (see Task D.3) and normal retries must throw an error without `moveToDelayed`. The logic above respects that.
 
-⚠️ Cette task contient une subtilité d'API BullMQ qui mérite vérification rigoureuse à l'implémentation. Si `moveToDelayed` ne fonctionne pas comme prévu, l'alternative est d'utiliser `WaitingChildren` ou d'ajouter `delay` via `Job.changeDelay`. Voir la doc BullMQ pour la version exacte utilisée.
+⚠️ This task involves a BullMQ API subtlety that deserves rigorous verification during implementation. If `moveToDelayed` doesn't work as expected, the alternative is to use `WaitingChildren` or to add `delay` via `Job.changeDelay`. See the BullMQ docs for the exact version used.
 
 - [ ] **Step 2: Typecheck**
 
@@ -3872,7 +3872,7 @@ git commit -m "feat(worker): wire BullMQ worker with deliver orchestrator"
 **Files:**
 - Create: `vitest.integration.config.ts`, `tests/integration/setup.ts`, `tests/integration/happy-path.test.ts`
 
-- [ ] **Step 1: Créer `vitest.integration.config.ts`**
+- [ ] **Step 1: Create `vitest.integration.config.ts`**
 
 ```typescript
 import { defineConfig } from 'vitest/config'
@@ -3889,7 +3889,7 @@ export default defineConfig({
 })
 ```
 
-- [ ] **Step 2: Créer `tests/integration/setup.ts`**
+- [ ] **Step 2: Create `tests/integration/setup.ts`**
 
 ```typescript
 import { startInfra, type StartedInfra } from '@vitrine/test-helpers'
@@ -3907,9 +3907,9 @@ export async function teardown() {
 }
 ```
 
-- [ ] **Step 3: Écrire le test happy-path**
+- [ ] **Step 3: Write the happy-path test**
 
-`tests/integration/happy-path.test.ts` :
+`tests/integration/happy-path.test.ts`:
 
 ```typescript
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -3929,7 +3929,7 @@ describe('happy path', () => {
     await fake.close()
   })
 
-  it("livre un event au premier coup", async () => {
+  it("delivers an event on the first try", async () => {
     const { clientId, apiKey } = await seedClient(app.db, { name: 'happy-path' })
     const { endpointId } = await seedEndpoint(app.db, { clientId, url: fake.url, masterKey: app.masterKey })
     fake.setResponse({ kind: 'ok', statusCode: 200 })
@@ -3971,15 +3971,15 @@ async function waitFor(predicate: () => Promise<boolean>, timeoutMs: number): Pr
 }
 ```
 
-- [ ] **Step 4: Lancer**
+- [ ] **Step 4: Run**
 
 ```bash
 pnpm test:integration
 ```
 
-Expected: 1 test pass. (~2 min : pull images + migrate + run.)
+Expected: 1 test pass. (~2 min: pull images + migrate + run.)
 
-Si fail : déboguer. Les causes typiques : signature de `buildApp` ne correspond pas, le worker ne pick pas le job, la migration n'a pas été appliquée.
+If it fails: debug. Typical causes: `buildApp` signature doesn't match, the worker doesn't pick up the job, the migration wasn't applied.
 
 - [ ] **Step 5: Commit**
 
@@ -3990,37 +3990,37 @@ git commit -m "test(integration): bootstrap test setup and happy path"
 
 ---
 
-### Task H.2-H.10 — Cas d'intégration restants
+### Task H.2-H.10 — Remaining integration cases
 
-Pour chacun des cas suivants, suivre le pattern de Task H.1 : créer un fichier `tests/integration/<nom>.test.ts`, écrire le test (avec `seedClient` + `seedEndpoint` + `startFakeEndpoint`), lancer `pnpm test:integration`, commit.
+For each of the following cases, follow the Task H.1 pattern: create a `tests/integration/<name>.test.ts` file, write the test (with `seedClient` + `seedEndpoint` + `startFakeEndpoint`), run `pnpm test:integration`, commit.
 
-Liste complète des tests à écrire (un fichier par catégorie) :
+Full list of tests to write (one file per category):
 
-| Fichier | Cas |
+| File | Case |
 |---|---|
-| `retry.test.ts` | `setResponse({kind:'fail',statusCode:500})` 3 fois, puis `{kind:'ok'}` ; vérifier 4 attempts en DB et status=delivered |
-| `dlq.test.ts` | `{kind:'fail',statusCode:500}` permanent ; après ~7 attempts, status=dead. Pour ne pas attendre 7h en test : surcharger le schedule via `process.env.RETRY_SCHEDULE_OVERRIDE` ou injecter un schedule rapide via build-options. |
-| `breaker.test.ts` | Pousser 5 events vers endpoint 5xx → 6e ne doit pas faire d'HTTP call ; 6e doit attendre. Recovery + re-open dans des sous-tests. |
-| `replay.test.ts` | Replay dead → delivered ; replay delivered → autorisé ; replay pending → 409 |
-| `idempotency.test.ts` | Hit (même key + même payload) ; conflict (même key + payload différent) ; missing (400) |
-| `auth.test.ts` | Bearer manquant → 401 ; bearer invalide → 401 |
-| `cross-client.test.ts` | Client A tente POST /events avec endpoint client B → 404 |
-| `archived-endpoint.test.ts` | Soft-delete endpoint puis POST event → 404 ; events historiques restent listables. |
-| `four-xx.test.ts` | 401 du fake endpoint → status=dead direct, 1 seule attempt, pas de retry |
-| `retry-after.test.ts` | 429 + Retry-After: 2 (secondes) → vérifier que la prochaine tentative arrive ~2s plus tard |
+| `retry.test.ts` | `setResponse({kind:'fail',statusCode:500})` 3 times, then `{kind:'ok'}`; check 4 attempts in DB and status=delivered |
+| `dlq.test.ts` | Permanent `{kind:'fail',statusCode:500}`; after ~7 attempts, status=dead. To avoid waiting 7h in the test: override the schedule via `process.env.RETRY_SCHEDULE_OVERRIDE` or inject a fast schedule via build-options. |
+| `breaker.test.ts` | Push 5 events to a 5xx endpoint → the 6th must not make an HTTP call; the 6th must wait. Recovery + re-open in sub-tests. |
+| `replay.test.ts` | Replay dead → delivered; replay delivered → allowed; replay pending → 409 |
+| `idempotency.test.ts` | Hit (same key + same payload); conflict (same key + different payload); missing (400) |
+| `auth.test.ts` | Missing bearer → 401; invalid bearer → 401 |
+| `cross-client.test.ts` | Client A tries POST /events with client B's endpoint → 404 |
+| `archived-endpoint.test.ts` | Soft-delete endpoint then POST event → 404; historical events remain listable. |
+| `four-xx.test.ts` | 401 from the fake endpoint → status=dead immediately, only 1 attempt, no retry |
+| `retry-after.test.ts` | 429 + Retry-After: 2 (seconds) → check that the next attempt arrives ~2s later |
 
-NOTE sur DLQ et breaker tests : pour rendre les tests rapides (vs 7h11 nominal), il faut un mécanisme d'override du schedule. Une option propre : ajouter un paramètre `RETRY_SCHEDULE_OVERRIDE_MS` (env var ou option de `buildApp`) qui remplace `RETRY_SCHEDULE_MS` par une version compressée `[0, 50, 100, 200, 400, 800, 1600]` ms. Implementation à ajouter dans Task C.2 si pas déjà fait. L'override est explicitement prévu pour tests/dev, jamais activé en prod.
+NOTE on DLQ and breaker tests: to make the tests fast (vs 7h11 nominal), we need a schedule override mechanism. A clean option: add a `RETRY_SCHEDULE_OVERRIDE_MS` parameter (env var or `buildApp` option) that replaces `RETRY_SCHEDULE_MS` with a compressed version `[0, 50, 100, 200, 400, 800, 1600]` ms. Implementation to add in Task C.2 if not already done. The override is explicitly meant for tests/dev, never enabled in prod.
 
-⚠️ **Add task C.2.bis (avant H.2)** : injecter le schedule override.
+⚠️ **Add task C.2.bis (before H.2)**: inject the schedule override.
 
-#### Task C.2.bis — Schedule override pour tests
+#### Task C.2.bis — Schedule override for tests
 
 **Files:**
 - Modify: `packages/core/src/retry/backoff.ts`
 
-- [ ] **Step 1: Refactorer pour accepter un schedule injectable**
+- [ ] **Step 1: Refactor to accept an injectable schedule**
 
-Ajouter à `packages/core/src/retry/backoff.ts` :
+Add to `packages/core/src/retry/backoff.ts`:
 
 ```typescript
 let activeSchedule: readonly number[] = RETRY_SCHEDULE_MS
@@ -4034,7 +4034,7 @@ export function getActiveSchedule(): readonly number[] {
 }
 ```
 
-Et modifier `backoffMs` pour utiliser `activeSchedule` au lieu de `RETRY_SCHEDULE_MS` directement :
+And modify `backoffMs` to use `activeSchedule` instead of `RETRY_SCHEDULE_MS` directly:
 
 ```typescript
 export function backoffMs(attempt: number, rng: () => number = Math.random): number {
@@ -4051,18 +4051,18 @@ export function getMaxAttempts(): number {
 }
 ```
 
-Mettre à jour le custom backoff de BullMQ pour appeler `getMaxAttempts()` au lieu de `MAX_ATTEMPTS` constant.
+Update the BullMQ custom backoff to call `getMaxAttempts()` instead of the `MAX_ATTEMPTS` constant.
 
 - [ ] **Step 2: Tests**
 
-Ajouter à `packages/core/tests/retry/backoff.test.ts` :
+Add to `packages/core/tests/retry/backoff.test.ts`:
 
 ```typescript
 import { setRetryScheduleOverride, RETRY_SCHEDULE_MS, getActiveSchedule } from '../../src/retry/backoff'
 
 afterEach(() => setRetryScheduleOverride(null))
 
-it('schedule override remplace la table', () => {
+it('schedule override replaces the table', () => {
   setRetryScheduleOverride([0, 50, 100])
   expect(getActiveSchedule()).toEqual([0, 50, 100])
   expect(backoffMs(2, () => 0.5)).toBe(50)
@@ -4077,7 +4077,7 @@ git add packages/core/src/retry/backoff.ts packages/core/tests/retry/backoff.tes
 git commit -m "feat(core/retry): allow injecting a schedule override for tests"
 ```
 
-Et dans `tests/integration/setup.ts`, appeler :
+And in `tests/integration/setup.ts`, call:
 
 ```typescript
 import { setRetryScheduleOverride } from '@vitrine/core'
@@ -4086,12 +4086,12 @@ setRetryScheduleOverride([0, 50, 100, 200, 400, 800, 1600])
 
 ---
 
-### Task H.2 — Test retry réussi
+### Task H.2 — Successful retry test
 
 **Files:**
 - Create: `tests/integration/retry.test.ts`
 
-- [ ] **Step 1: Écrire le test**
+- [ ] **Step 1: Write the test**
 
 ```typescript
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -4099,7 +4099,7 @@ import { startApp, seedClient, seedEndpoint, startFakeEndpoint, type AppFixture,
 import { eq } from 'drizzle-orm'
 import { deliveryAttempts } from '@vitrine/db'
 
-describe('retry réussi', () => {
+describe('successful retry', () => {
   let app: AppFixture
   let fake: FakeEndpoint
 
@@ -4113,7 +4113,7 @@ describe('retry réussi', () => {
     await fake.close()
   })
 
-  it("livre après 3 échecs 5xx puis succès", async () => {
+  it("delivers after 3 5xx failures then success", async () => {
     const { clientId, apiKey } = await seedClient(app.db, { name: 'retry' })
     const { endpointId } = await seedEndpoint(app.db, { clientId, url: fake.url, masterKey: app.masterKey })
 
@@ -4181,13 +4181,13 @@ git commit -m "test(integration): retry succeeds after transient 5xx"
 **Files:**
 - Create: `tests/integration/dlq.test.ts`
 
-- [ ] **Step 1: Écrire**
+- [ ] **Step 1: Write**
 
 ```typescript
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { startApp, seedClient, seedEndpoint, startFakeEndpoint, type AppFixture, type FakeEndpoint } from '@vitrine/test-helpers'
 
-describe('DLQ après 7 échecs', () => {
+describe('DLQ after 7 failures', () => {
   let app: AppFixture
   let fake: FakeEndpoint
   beforeAll(async () => {
@@ -4199,7 +4199,7 @@ describe('DLQ après 7 échecs', () => {
     await fake.close()
   })
 
-  it('arrive en status=dead après épuisement', async () => {
+  it('reaches status=dead after exhaustion', async () => {
     const { clientId, apiKey } = await seedClient(app.db, { name: 'dlq' })
     const { endpointId } = await seedEndpoint(app.db, { clientId, url: fake.url, masterKey: app.masterKey })
     fake.setResponse({ kind: 'fail', statusCode: 500 })
@@ -4249,7 +4249,7 @@ git commit -m "test(integration): dlq after exhausting retries"
 **Files:**
 - Create: `tests/integration/breaker.test.ts`
 
-- [ ] **Step 1: Écrire**
+- [ ] **Step 1: Write**
 
 ```typescript
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -4267,12 +4267,12 @@ describe('breaker', () => {
     await fake.close()
   })
 
-  it('5 échecs consécutifs → 6e event ne fait pas d HTTP call', async () => {
+  it('5 consecutive failures → 6th event makes no HTTP call', async () => {
     const { clientId, apiKey } = await seedClient(app.db, { name: 'breaker' })
     const { endpointId } = await seedEndpoint(app.db, { clientId, url: fake.url, masterKey: app.masterKey })
     fake.setResponse({ kind: 'fail', statusCode: 503 })
 
-    // Pousse 5 events séparés. Chacun va 5xx → 5 failures consécutifs sur 1ère attempt.
+    // Push 5 separate events. Each one gets a 5xx → 5 consecutive failures on the 1st attempt.
     for (let i = 0; i < 5; i++) {
       await fetch(`${app.baseUrl}/events`, {
         method: 'POST',
@@ -4285,11 +4285,11 @@ describe('breaker', () => {
       })
     }
 
-    // attendre que les 5 first attempts aient tapé le fake
+    // wait until the 5 first attempts have hit the fake
     await waitFor(async () => fake.received().length >= 5, 5_000)
     const before = fake.received().length
 
-    // 6e event
+    // 6th event
     await fetch(`${app.baseUrl}/events`, {
       method: 'POST',
       headers: {
@@ -4300,7 +4300,7 @@ describe('breaker', () => {
       body: JSON.stringify({ endpoint_id: endpointId, event_type: 'order.shipped', payload: { i: 6 } })
     })
 
-    // Attendre 1s, vérifier que le fake n'a PAS reçu de nouvel appel
+    // Wait 1s, check that the fake did NOT receive a new call
     await new Promise((r) => setTimeout(r, 1000))
     expect(fake.received().length).toBe(before)
   })
@@ -4326,21 +4326,21 @@ git commit -m "test(integration): breaker opens after 5 consecutive failures"
 
 ---
 
-### Task H.5 — Tests replay
+### Task H.5 — Replay tests
 
 **Files:**
 - Create: `tests/integration/replay.test.ts`
 
-- [ ] **Step 1: Écrire** (3 sous-tests : dead → re-livré, delivered → re-livré, pending → 409)
+- [ ] **Step 1: Write** (3 sub-tests: dead → redelivered, delivered → redelivered, pending → 409)
 
-Pattern similaire à H.4. Pour `dead`, push avec endpoint 5xx jusqu'à dead, puis switch fake en ok, puis POST replay. Pour `pending`, push event sur endpoint slow (timeout), puis tenter replay — attendre 409.
+Similar pattern to H.4. For `dead`, push with a 5xx endpoint until dead, then switch the fake to ok, then POST replay. For `pending`, push an event to a slow endpoint (timeout), then try replay — expect 409.
 
 ```typescript
-// Squelette : 3 it(), chacun seed son client+endpoint, manipule l'état, fetch /events/:id/replay, asserte la réponse.
-// Voir le détail dans le commit task H.5 ; le test fait ~80-100 lignes au total.
+// Skeleton: 3 it(), each seeds its own client+endpoint, manipulates state, fetches /events/:id/replay, asserts the response.
+// See details in the task H.5 commit; the test is ~80-100 lines total.
 ```
 
-(Les it() complets sont laissés à l'exécutant qui suit le pattern de H.2/H.3 ; chaque it() : setup, action, assertion.)
+(The full it() blocks are left to the implementer following the H.2/H.3 pattern; each it(): setup, action, assertion.)
 
 - [ ] **Step 2: Run + commit**
 
@@ -4352,12 +4352,12 @@ git commit -m "test(integration): replay variants (dead/delivered/pending)"
 
 ---
 
-### Task H.6 — Tests idempotency
+### Task H.6 — Idempotency tests
 
 **Files:**
 - Create: `tests/integration/idempotency.test.ts`
 
-- [ ] **Step 1: Écrire** (3 sous-tests : hit, conflict, missing)
+- [ ] **Step 1: Write** (3 sub-tests: hit, conflict, missing)
 
 ```typescript
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -4377,7 +4377,7 @@ describe('idempotency', () => {
     await fake.close()
   })
 
-  it('hit: même key + même payload → 200 avec event_id existant', async () => {
+  it('hit: same key + same payload → 200 with existing event_id', async () => {
     const { clientId, apiKey } = await seedClient(app.db, { name: 'idem-hit' })
     const { endpointId } = await seedEndpoint(app.db, { clientId, url: fake.url, masterKey: app.masterKey })
     const body = JSON.stringify({ endpoint_id: endpointId, event_type: 'order.shipped', payload: { id: 1 } })
@@ -4397,7 +4397,7 @@ describe('idempotency', () => {
     expect(all.length).toBe(1)
   })
 
-  it('conflict: même key + payload différent → 422', async () => {
+  it('conflict: same key + different payload → 422', async () => {
     const { clientId, apiKey } = await seedClient(app.db, { name: 'idem-conflict' })
     const { endpointId } = await seedEndpoint(app.db, { clientId, url: fake.url, masterKey: app.masterKey })
     const headers = { 'content-type': 'application/json', authorization: `Bearer ${apiKey}`, 'idempotency-key': 'idem-c' }
@@ -4438,20 +4438,20 @@ git commit -m "test(integration): idempotency hit, conflict, missing"
 
 ---
 
-### Task H.7 — Tests auth + cross-client + archived endpoint
+### Task H.7 — Auth + cross-client + archived endpoint tests
 
 **Files:**
 - Create: `tests/integration/auth.test.ts`, `tests/integration/cross-client.test.ts`, `tests/integration/archived-endpoint.test.ts`
 
-- [ ] **Step 1: Écrire les trois fichiers**
+- [ ] **Step 1: Write the three files**
 
-Pattern: chaque fichier ~30-50 lignes, suit le squelette de H.6. Cas couverts :
+Pattern: each file ~30-50 lines, follows the H.6 skeleton. Covered cases:
 
-- `auth.test.ts` : POST /events sans Authorization → 401 ; avec un token aléatoire invalide → 401.
-- `cross-client.test.ts` : seed deux clients A et B, créer un endpoint sous B, tenter POST /events sous A avec endpoint_id de B → 404.
-- `archived-endpoint.test.ts` : créer endpoint, DELETE pour soft-archive, POST event vers cet endpoint → 404. Mais GET /events?status=delivered doit toujours retourner les events historiques.
+- `auth.test.ts`: POST /events without Authorization → 401; with a random invalid token → 401.
+- `cross-client.test.ts`: seed two clients A and B, create an endpoint under B, try POST /events as A with B's endpoint_id → 404.
+- `archived-endpoint.test.ts`: create endpoint, DELETE to soft-archive, POST event to that endpoint → 404. But GET /events?status=delivered must still return the historical events.
 
-- [ ] **Step 2: Run + commit chacun**
+- [ ] **Step 2: Run + commit each**
 
 ```bash
 pnpm test:integration
@@ -4461,16 +4461,16 @@ git commit -m "test(integration): auth, cross-client isolation, archived endpoin
 
 ---
 
-### Task H.8 — Tests 4xx → DLQ et 429 + Retry-After
+### Task H.8 — 4xx → DLQ and 429 + Retry-After tests
 
 **Files:**
 - Create: `tests/integration/four-xx.test.ts`, `tests/integration/retry-after.test.ts`
 
-- [ ] **Step 1: Écrire**
+- [ ] **Step 1: Write**
 
-`four-xx.test.ts` : `fake.setResponse({ kind: 'fail', statusCode: 401 })` → vérifier que l'event arrive en status=dead avec une seule ligne `delivery_attempts`.
+`four-xx.test.ts`: `fake.setResponse({ kind: 'fail', statusCode: 401 })` → check that the event reaches status=dead with a single `delivery_attempts` row.
 
-`retry-after.test.ts` : `fake.setResponse({ kind: 'throttle', retryAfter: '2' })` puis switch en `ok` après 3s. Vérifier que la deuxième tentative arrive ~2s après la première (et non 50ms du schedule override).
+`retry-after.test.ts`: `fake.setResponse({ kind: 'throttle', retryAfter: '2' })` then switch to `ok` after 3s. Check that the second attempt arrives ~2s after the first (and not 50ms from the schedule override).
 
 - [ ] **Step 2: Run + commit**
 
@@ -4482,14 +4482,14 @@ git commit -m "test(integration): 4xx direct dlq and 429 retry-after respected"
 
 ---
 
-## Phase I — CLI + dev runner (M2 finition)
+## Phase I — CLI + dev runner (M2 finishing)
 
 ### Task I.1 — CLI create-client
 
 **Files:**
 - Create: `scripts/cli/create-client.ts`
 
-- [ ] **Step 1: Implémenter**
+- [ ] **Step 1: Implement**
 
 ```typescript
 #!/usr/bin/env tsx
@@ -4520,7 +4520,7 @@ docker compose up -d
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/vitrine pnpm cli:create-client --name acme
 ```
 
-Expected: deux lignes affichées avec un `cl_*` et un `cl_secret_*`.
+Expected: two lines printed with a `cl_*` and a `cl_secret_*`.
 
 - [ ] **Step 3: Commit**
 
@@ -4534,13 +4534,13 @@ git commit -m "feat(cli): add create-client command"
 ### Task I.2 — Dev runner (concurrently API + Worker)
 
 **Files:**
-- Modify: `package.json` (script `dev` déjà présent depuis A.1)
+- Modify: `package.json` (`dev` script already present since A.1)
 
-- [ ] **Step 1: Vérifier le script `dev`**
+- [ ] **Step 1: Check the `dev` script**
 
-Cf. A.1 — `concurrently -n api,worker -c blue,magenta 'pnpm --filter @vitrine/api dev' 'pnpm --filter @vitrine/worker dev'`
+See A.1 — `concurrently -n api,worker -c blue,magenta 'pnpm --filter @vitrine/api dev' 'pnpm --filter @vitrine/worker dev'`
 
-- [ ] **Step 2: Smoke test end-to-end manuel**
+- [ ] **Step 2: Manual end-to-end smoke test**
 
 ```bash
 docker compose up -d
@@ -4551,92 +4551,92 @@ LOG_LEVEL=debug \
 pnpm dev
 ```
 
-Dans un autre terminal :
+In another terminal:
 
 ```bash
-# créer un client
+# create a client
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/vitrine pnpm cli:create-client --name dev
-# → noter cl_secret_xxx
+# → note cl_secret_xxx
 
-# créer un endpoint
+# create an endpoint
 curl -s -X POST http://localhost:3000/endpoints \
   -H "Authorization: Bearer cl_secret_xxx" \
   -H "Content-Type: application/json" \
   -d '{"url":"https://httpbin.org/post"}'
-# → noter ep_xxx et le secret
+# → note ep_xxx and the secret
 
-# pousser un event
+# push an event
 curl -s -X POST http://localhost:3000/events \
   -H "Authorization: Bearer cl_secret_xxx" \
   -H "Idempotency-Key: smoke-1" \
   -H "Content-Type: application/json" \
   -d '{"endpoint_id":"ep_xxx","event_type":"smoke.test","payload":{"hello":"world"}}'
 
-# vérifier le status
+# check the status
 curl -s http://localhost:3000/events/evt_xxx -H "Authorization: Bearer cl_secret_xxx"
 ```
 
-Expected: l'event finit en `status: "delivered"` après quelques secondes.
+Expected: the event ends up in `status: "delivered"` after a few seconds.
 
-- [ ] **Step 3: Commit (rien à committer si tout marche déjà)**
+- [ ] **Step 3: Commit (nothing to commit if everything already works)**
 
-Si une correction a dû être faite, commit. Sinon, passer.
+If a fix had to be made, commit. Otherwise, skip.
 
 ---
 
-## Phase J — README minimal (in-scope V1, sans embed PNG)
+## Phase J — Minimal README (in-scope V1, without PNG embed)
 
 ### Task J.1 — README dev-oriented
 
 **Files:**
 - Create: `README.md`
 
-- [ ] **Step 1: Écrire**
+- [ ] **Step 1: Write**
 
 ```markdown
 # Webhook Delivery Service
 
-Service Node/TypeScript qui ingère des événements via une API HTTP et les livre à des endpoints clients tiers, avec retry exponentiel, circuit breaker, idempotency keys et replay manuel. Modèle d'API aligné sur [Standard Webhooks](https://www.standardwebhooks.com).
+Node/TypeScript service that ingests events via an HTTP API and delivers them to third-party client endpoints, with exponential retry, circuit breaker, idempotency keys and manual replay. API model aligned with [Standard Webhooks](https://www.standardwebhooks.com).
 
-> Projet vitrine. Pas un service de production utilisé par de vrais clients.
+> Showcase project. Not a production service used by real customers.
 
-## Fonctionnalités V1
+## V1 features
 
-- API multi-tenant Fastify avec auth Bearer (argon2id).
-- Idempotency keys obligatoires (Redis, TTL 24h).
-- Worker BullMQ avec retry exponentiel (1s → 10s → 1min → 10min → 1h → 6h, 7 attempts max).
-- Circuit breaker partagé (state machine atomique en Lua).
-- Signature HMAC Standard Webhooks (`webhook-id`, `webhook-timestamp`, `webhook-signature`).
-- Secrets chiffrés au repos (AES-256-GCM, master key séparée).
-- Replay single-event.
-- Tests d'intégration avec Testcontainers (Postgres + Redis).
+- Multi-tenant Fastify API with Bearer auth (argon2id).
+- Mandatory idempotency keys (Redis, 24h TTL).
+- BullMQ worker with exponential retry (1s → 10s → 1min → 10min → 1h → 6h, 7 attempts max).
+- Shared circuit breaker (atomic state machine in Lua).
+- Standard Webhooks HMAC signature (`webhook-id`, `webhook-timestamp`, `webhook-signature`).
+- Secrets encrypted at rest (AES-256-GCM, separate master key).
+- Single-event replay.
+- Integration tests with Testcontainers (Postgres + Redis).
 
 ## Out of scope V1
 
-Voir [`docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md`](docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md) section 10. En particulier : pas de signup public, pas de rotation de secret endpoint, pas de batch replay, pas d'observabilité prod-grade, pas de SDK clients, pas de port Rust (autre spec), pas de dashboard (autre spec), pas d'AWS (autre spec).
+See [`docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md`](docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md) section 10. In particular: no public signup, no endpoint secret rotation, no batch replay, no prod-grade observability, no client SDKs, no Rust port (separate spec), no dashboard (separate spec), no AWS (separate spec).
 
 ## Run local
 
-Pré-requis : Node 22 LTS, pnpm 9, Docker Compose.
+Prerequisites: Node 22 LTS, pnpm 9, Docker Compose.
 
 ```bash
 nvm use
 pnpm install
 
-# infra locale
+# local infra
 docker compose up -d
 
 # migrations
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/vitrine pnpm db:push
 
-# créer un client (note l'API key)
+# create a client (note the API key)
 DATABASE_URL=... pnpm cli:create-client --name local
 
-# .env (cf. .env.example)
+# .env (see .env.example)
 cp .env.example .env
-# remplir MASTER_ENCRYPTION_KEY = $(openssl rand -base64 32)
+# fill in MASTER_ENCRYPTION_KEY = $(openssl rand -base64 32)
 
-# lancer API + Worker
+# start API + Worker
 pnpm dev
 ```
 
@@ -4649,19 +4649,19 @@ pnpm test:integration    # ~17 tests, ~3 min (Testcontainers)
 
 ## Architecture
 
-Voir [`docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md`](docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md).
+See [`docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md`](docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-design.md).
 
-## Plan d'implémentation
+## Implementation plan
 
-Voir [`docs/superpowers/plans/2026-05-09-webhook-delivery-hot-path-core.md`](docs/superpowers/plans/2026-05-09-webhook-delivery-hot-path-core.md) (ce fichier-ci) pour le découpage tâche-par-tâche.
+See [`docs/superpowers/plans/2026-05-09-webhook-delivery-hot-path-core.md`](docs/superpowers/plans/2026-05-09-webhook-delivery-hot-path-core.md) (this file) for the task-by-task breakdown.
 
-## Structure du repo
+## Repo structure
 
 ```
 apps/                         # API + Worker
 packages/                     # core, db, queue, test-helpers
 tests/integration/            # 17 tests Testcontainers
-docs/superpowers/             # specs et plans
+docs/superpowers/             # specs and plans
 ```
 ```
 
@@ -4676,35 +4676,35 @@ git commit -m "docs: add minimal README with run local and test instructions"
 
 ## Self-review
 
-Le rédacteur de ce plan se relit :
+The author of this plan reviews it:
 
-**Spec coverage** :
-- Section 1 (objectifs) → Phase A scaffold + README J.1 ✓
+**Spec coverage**:
+- Section 1 (goals) → Phase A scaffold + README J.1 ✓
 - Section 2 (architecture) → Phases A, F, G ✓
-- Section 3 (API publique) → Phase F (toutes les routes du spec) ✓
-- Section 4 (modèle de données) → Tasks A.3 (schema), D.1-D.2 (Redis), F.4-F.6 (services) ✓
-- Section 5 (mécanique) → Phases C (pure logic), D (Lua + queue), G (worker orchestrator), H (tests qui valident la mécanique) ✓
-- Section 6 (sécurité) → Tasks B.1-B.3 (crypto), F.3 (auth) ✓
-- Section 7 (tests) → Phase H pour intégration, Phases B-C pour unit ✓
+- Section 3 (public API) → Phase F (all spec routes) ✓
+- Section 4 (data model) → Tasks A.3 (schema), D.1-D.2 (Redis), F.4-F.6 (services) ✓
+- Section 5 (mechanics) → Phases C (pure logic), D (Lua + queue), G (worker orchestrator), H (tests validating the mechanics) ✓
+- Section 6 (security) → Tasks B.1-B.3 (crypto), F.3 (auth) ✓
+- Section 7 (tests) → Phase H for integration, Phases B-C for unit ✓
 - Section 8 (stack) → Tasks A.1-A.4 ✓
-- Section 9 (déploiement) → **OUT-OF-SCOPE de ce plan ; déplacé en Plan 2 (Chaos + Deploy)** ✓
-- Section 10 (out of scope) → reproduit dans le README J.1 ✓
+- Section 9 (deployment) → **OUT-OF-SCOPE for this plan; moved to Plan 2 (Chaos + Deploy)** ✓
+- Section 10 (out of scope) → reproduced in README J.1 ✓
 
-**Placeholder scan** :
-- "TBD" / "TODO" : aucun.
-- "Add appropriate error handling" : aucun ; les codes d'erreur sont explicites.
-- "Similar to Task N" : pas utilisé ; chaque task répète son code.
-- Notes ⚠️ ajoutées en F.5 (raw SQL à substituer par query builder Drizzle) et G.3 (subtilité moveToDelayed) — ce sont des avertissements pour l'engineer, pas des placeholders.
+**Placeholder scan**:
+- "TBD" / "TODO": none.
+- "Add appropriate error handling": none; error codes are explicit.
+- "Similar to Task N": not used; each task repeats its code.
+- ⚠️ notes added in F.5 (raw SQL to replace with the Drizzle query builder) and G.3 (moveToDelayed subtlety) — these are warnings for the engineer, not placeholders.
 
-**Type consistency** :
-- `BreakerState` défini en C.6, consommé en D.2, G.2 ✓
-- `Outcome` défini en C.3, consommé en G.1, G.2 ✓
-- `signWebhook(secret, id, timestamp, body)` partout cohérent ✓
-- `recordOutcome(redis, endpointId, event, nowMs)` partout cohérent ✓
+**Type consistency**:
+- `BreakerState` defined in C.6, consumed in D.2, G.2 ✓
+- `Outcome` defined in C.3, consumed in G.1, G.2 ✓
+- `signWebhook(secret, id, timestamp, body)` consistent everywhere ✓
+- `recordOutcome(redis, endpointId, event, nowMs)` consistent everywhere ✓
 
 **Issues fixed inline** :
-- Task H.2-H.10 contenait initialement une référence à un schedule override pas encore introduit → ajouté Task C.2.bis avant H.2.
-- Task F.5 raw SQL flag ⚠️ pour substitution par query builder Drizzle.
+- Task H.2-H.10 initially referenced a schedule override not yet introduced → added Task C.2.bis before H.2.
+- Task F.5 raw SQL flagged ⚠️ for replacement with the Drizzle query builder.
 
 ---
 
@@ -4712,12 +4712,12 @@ Le rédacteur de ce plan se relit :
 
 `docs/superpowers/plans/2026-05-09-webhook-delivery-hot-path-core.md`
 
-**À la suite : un Plan 2 (Chaos demo + Fly deploy + README polish) sera écrit séparément avec une nouvelle invocation de la skill writing-plans.**
+**Next: a Plan 2 (Chaos demo + Fly deploy + README polish) will be written separately with a new invocation of the writing-plans skill.**
 
 Two execution options:
 
-**1. Subagent-Driven (recommended)** — je dispatch un fresh subagent par task, review entre les tasks, fast iteration.
+**1. Subagent-Driven (recommended)** — I dispatch a fresh subagent per task, review between tasks, fast iteration.
 
-**2. Inline Execution** — exécute les tasks dans cette session via executing-plans, batch execution avec checkpoints pour review.
+**2. Inline Execution** — execute the tasks in this session via executing-plans, batch execution with checkpoints for review.
 
-**Quelle approche ?**
+**Which approach?**

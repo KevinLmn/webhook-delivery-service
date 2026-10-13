@@ -38,6 +38,6 @@ jobs:
       - name: Integration tests (Testcontainers)
         run: pnpm test:integration
         env:
-          # Testcontainers détecte automatiquement le Docker daemon de runner.
-          # Ce flag réduit le bruit de logs en CI.
+          # Testcontainers auto-detects the runner's Docker daemon.
+          # This flag reduces log noise in CI.
           DEBUG: ''

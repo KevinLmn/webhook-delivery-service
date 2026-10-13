@@ -3,14 +3,14 @@ import { and, count, eq, gte } from 'drizzle-orm'
 import type { Redis } from 'ioredis'
 
 export interface Sample {
-  /** ms depuis le startedAt global du run */
+  /** ms since the run's global startedAt */
   tMs: number
   delivered: number
   pending: number
   dead: number
   breakerState: 'closed' | 'open' | 'half_open' | 'unknown'
   breakerSkipCount: number
-  /** P50 et P99 des duration_ms sur les attempts terminées dans la dernière fenêtre */
+  /** P50 and P99 of duration_ms over attempts completed in the last window */
   p50LatencyMs: number | null
   p99LatencyMs: number | null
   totalAttempts: number
@@ -74,8 +74,8 @@ export async function sampleOnce(opts: {
     try {
       const parsed = JSON.parse(breakerJson) as BreakerJson
       breakerState = parsed.state
-      // Lazy transition open → half_open : si l'expiration est dépassée à la lecture,
-      // on l'affiche comme half_open dans la viz (cohérent avec la logique runtime).
+      // Lazy open → half_open transition: if expiry has passed at read time,
+      // show it as half_open in the viz (consistent with the runtime logic).
       if (
         parsed.state === 'open' &&
         parsed.opened_at !== null &&

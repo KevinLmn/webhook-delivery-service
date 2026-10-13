@@ -25,7 +25,7 @@ describe('idempotency', () => {
     await fake.close()
   })
 
-  it('hit: même key + même payload → 200 avec event_id existant', async () => {
+  it('hit: same key + same payload → 200 with existing event_id', async () => {
     const { clientId, apiKey } = await seedClient(app.db, { name: 'idem-hit' })
     const { endpointId } = await seedEndpoint(app.db, {
       clientId,
@@ -62,7 +62,7 @@ describe('idempotency', () => {
     expect(list[0]!.id).toBe(id1)
   })
 
-  it('conflict: même key + payload différent → 422', async () => {
+  it('conflict: same key + different payload → 422', async () => {
     const { clientId, apiKey } = await seedClient(app.db, { name: 'idem-conflict' })
     const { endpointId } = await seedEndpoint(app.db, {
       clientId,

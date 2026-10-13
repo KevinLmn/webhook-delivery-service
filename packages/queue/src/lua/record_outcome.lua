@@ -1,12 +1,24 @@
--- KEYS[1] : breaker:{endpoint_id}
+-- ============================================================================
+--  record_outcome.lua — The CIRCUIT BREAKER, the version that ACTUALLY runs.
+--
+--  ⭐ WHY LUA? The breaker is SHARED between 10 concurrent workers
+--  (and several processes). "Read state → decide → write back" must be
+--  ATOMIC, otherwise two workers step on each other (race condition). A Lua
+--  script runs ATOMICALLY inside Redis: nothing interleaves during its
+--  execution. This is THE most subtle technical point of the project.
+--  (fsm.ts is the same logic as a pure/testable version; THIS is the real one.)
+-- ============================================================================
+
+-- KEYS[1] : breaker:{endpoint_id}   (the Redis key of THIS breaker)
 -- ARGV[1] : event ('success' | 'failure' | 'read')
 -- ARGV[2] : nowMs
--- ARGV[3] : initialOpenMs (30000)
--- ARGV[4] : maxOpenMs (1800000)
--- ARGV[5] : failThreshold (5)
--- ARGV[6] : ttlSec (86400)
--- Returns : encoded JSON state
+-- ARGV[3] : initialOpenMs (30000)   -- initial cooldown: 30s
+-- ARGV[4] : maxOpenMs (1800000)     -- cooldown cap: 30 min
+-- ARGV[5] : failThreshold (5)       -- 5 failures → open
+-- ARGV[6] : ttlSec (86400)          -- state expires after 24h of inactivity
+-- Returns: the state encoded as JSON
 
+-- 1) Read the current state. If it doesn't exist yet → default state "closed".
 local raw = redis.call('GET', KEYS[1])
 local state
 if raw then
@@ -22,19 +34,22 @@ local cap = tonumber(ARGV[4])
 local threshold = tonumber(ARGV[5])
 local ttl = tonumber(ARGV[6])
 
--- Lazy transition open -> half_open on read
+-- 2) Lazy open -> half_open transition: if the cooldown has elapsed, switch
+--    to "probe" BEFORE applying the event. (Nobody "wakes up" the breaker:
+--    the next read is what notices that the time has passed.)
 if state.state == 'open' and state.openedAt and (state.openedAt + state.openDurationMs) <= now then
   state.state = 'half_open'
   state.openedAt = cjson.null
 end
 
+-- 3) The state machine (same rules as fsm.ts):
 if state.state == 'closed' then
   if event == 'success' then
-    state.failCount = 0
+    state.failCount = 0                 -- a success resets the counter
   elseif event == 'failure' then
     state.failCount = state.failCount + 1
     if state.failCount >= threshold then
-      state.state = 'open'
+      state.state = 'open'              -- 5th failure → OPEN
       state.openedAt = now
       state.failCount = 0
       state.openDurationMs = initial
@@ -42,6 +57,7 @@ if state.state == 'closed' then
   end
 elseif state.state == 'open' then
   if event == 'success' then
+    -- Defensive: a success while "open" shouldn't happen, but close cleanly anyway.
     state.state = 'closed'
     state.openedAt = cjson.null
     state.failCount = 0
@@ -49,18 +65,19 @@ elseif state.state == 'open' then
   end
 elseif state.state == 'half_open' then
   if event == 'success' then
-    state.state = 'closed'
+    state.state = 'closed'             -- probe succeeds → HEALED, close
     state.openedAt = cjson.null
     state.failCount = 0
     state.openDurationMs = initial
   elseif event == 'failure' then
-    state.state = 'open'
+    state.state = 'open'               -- probe fails → REOPEN
     state.openedAt = now
     state.failCount = 0
-    state.openDurationMs = math.min(state.openDurationMs * 2, cap)
+    state.openDurationMs = math.min(state.openDurationMs * 2, cap) -- cooldown DOUBLED (max 30 min)
   end
 end
 
+-- 4) Write the state back (with 24h TTL) and return it to the Node code.
 local encoded = cjson.encode(state)
 redis.call('SET', KEYS[1], encoded, 'EX', ttl)
 return encoded

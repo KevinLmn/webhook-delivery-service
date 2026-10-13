@@ -23,7 +23,7 @@ export interface RenderInput {
   phases: PhaseAnnotation[]
   totalEvents: number
   outDir: string
-  /** Préfixe nom de fichier, ex 2026-05-10-14-32 */
+  /** Filename prefix, e.g. 2026-05-10-14-32 */
   fileStem: string
 }
 
@@ -66,9 +66,9 @@ export async function renderChaosPng(input: RenderInput): Promise<string> {
   const dead = input.samples.map((s) => s.dead)
   const breaker = input.samples.map((s) => BREAKER_NUMERIC[s.breakerState])
 
-  // chart.js plugin "annotation" est dans le namespace officiel mais pas inclus
-  // par défaut. Pour rester sans dépendance supplémentaire, on bake les bandes
-  // de phase via un dataset de type "bar" semi-transparent en arrière-plan.
+  // The chart.js "annotation" plugin is in the official namespace but not included
+  // by default. To avoid an extra dependency, we bake the phase bands in
+  // via a semi-transparent "bar" dataset in the background.
 
   const phaseBars = input.phases.map((p) => {
     const arr = labels.map((l) => {

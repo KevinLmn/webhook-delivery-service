@@ -30,7 +30,7 @@ describe('retry succeeds after transient 5xx', () => {
     await fake.close()
   })
 
-  it('livre après quelques échecs 5xx puis succès', async () => {
+  it('delivers after a few 5xx failures then success', async () => {
     const { clientId, apiKey } = await seedClient(app.db, { name: 'retry' })
     const { endpointId } = await seedEndpoint(app.db, {
       clientId,

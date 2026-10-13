@@ -13,7 +13,7 @@ services:
       timeout: 3s
       retries: 20
     ports:
-      - "5433:5432"  # éviter collision avec docker-compose.yml dev qui occupe 5432
+      - "5433:5432"  # avoid clashing with the dev docker-compose.yml, which uses 5432
 
   redis:
     image: redis:7-alpine
@@ -25,7 +25,7 @@ services:
       timeout: 3s
       retries: 20
     ports:
-      - "6380:6379"  # idem, éviter collision avec dev
+      - "6380:6379"  # same, avoid clashing with dev
 
   migrate:
     build:
@@ -57,9 +57,9 @@ services:
       NODE_ENV: production
     command: ["pnpm", "--filter", "@vitrine/api", "start"]
     extra_hosts:
-      - "host.docker.internal:host-gateway"  # rendre le fake endpoint joignable sous Linux
+      - "host.docker.internal:host-gateway"  # make the fake endpoint reachable on Linux
     ports:
-      - "3001:3000"  # 3001 côté host pour éviter collision avec dev
+      - "3001:3000"  # 3001 on the host side to avoid clashing with dev
 
   worker:
     build:

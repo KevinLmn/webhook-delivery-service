@@ -25,7 +25,7 @@ describe('breaker opens after 5 consecutive failures', () => {
     await fake.close()
   })
 
-  it('5e échec consécutif ouvre le breaker; le 6e event ne déclenche pas de HTTP call', async () => {
+  it('5th consecutive failure opens the breaker; the 6th event triggers no HTTP call', async () => {
     const { clientId, apiKey } = await seedClient(app.db, { name: 'breaker' })
     const { endpointId } = await seedEndpoint(app.db, {
       clientId,
