@@ -16,11 +16,12 @@ export interface Sample {
   totalAttempts: number
 }
 
+// Shape written by packages/queue/src/lua/record_outcome.lua (camelCase)
 interface BreakerJson {
   state: 'closed' | 'open' | 'half_open'
-  opened_at: number | null
-  fail_count: number
-  open_duration_ms: number
+  openedAt: number | null
+  failCount: number
+  openDurationMs: number
 }
 
 function percentile(sortedAsc: number[], p: number): number | null {
@@ -78,8 +79,8 @@ export async function sampleOnce(opts: {
       // show it as half_open in the viz (consistent with the runtime logic).
       if (
         parsed.state === 'open' &&
-        parsed.opened_at !== null &&
-        parsed.opened_at + parsed.open_duration_ms <= now
+        typeof parsed.openedAt === 'number' &&
+        parsed.openedAt + parsed.openDurationMs <= now
       ) {
         breakerState = 'half_open'
       }
