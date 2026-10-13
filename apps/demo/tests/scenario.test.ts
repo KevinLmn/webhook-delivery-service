@@ -28,27 +28,30 @@ describe('scenario', () => {
   })
 
   it('an outage returns 500 even for poison payloads', () => {
-    expect(respond({ elapsedMs: 20_000, poison: true, random: 0.9 })).toBe(500)
+    expect(respond({ elapsedMs: 20_000, poison: true, flakySeq: 0 })).toBe(500)
   })
 
   it('poison payloads are rejected with 422 when the endpoint is up', () => {
-    expect(respond({ elapsedMs: 1_000, poison: true, random: 0.9 })).toBe(422)
-    expect(respond({ elapsedMs: 100_000, poison: true, random: 0.9 })).toBe(422)
+    expect(respond({ elapsedMs: 1_000, poison: true, flakySeq: 0 })).toBe(422)
+    expect(respond({ elapsedMs: 100_000, poison: true, flakySeq: 0 })).toBe(422)
   })
 
-  it('the flaky phase fails half the time', () => {
-    expect(respond({ elapsedMs: 50_000, poison: false, random: 0.2 })).toBe(500)
-    expect(respond({ elapsedMs: 50_000, poison: false, random: 0.7 })).toBe(200)
+  it('the flaky phase fails one request in three, and its first request (the probe) succeeds', () => {
+    const codes = [0, 1, 2, 3, 4, 5].map((flakySeq) =>
+      respond({ elapsedMs: 50_000, poison: false, flakySeq }),
+    )
+    expect(codes).toEqual([200, 200, 500, 200, 200, 500])
   })
 
-  it('4 events out of 100 are poison', () => {
+  it('1 event in 25 is poison', () => {
     const poison = Array.from({ length: TOTAL_EVENTS }, (_, i) => i).filter(isPoison)
-    expect(poison).toEqual([24, 49, 74, 99])
+    expect(poison).toHaveLength(TOTAL_EVENTS / 25)
+    expect(poison.slice(0, 2)).toEqual([24, 49])
   })
 
   it('pushes are spread over the push window', () => {
     expect(pushOffsetMs(0)).toBe(0)
     expect(pushOffsetMs(TOTAL_EVENTS - 1)).toBeLessThan(PUSH_DURATION_MS)
-    expect(pushOffsetMs(50)).toBe(PUSH_DURATION_MS / 2)
+    expect(pushOffsetMs(TOTAL_EVENTS / 2)).toBe(PUSH_DURATION_MS / 2)
   })
 })

@@ -136,6 +136,7 @@ export class RunManager {
       startedAt: Date.now(),
       status: 'running',
       stats: { received: 0, verified: 0, rejected: 0 },
+      flakySeq: 0,
       pushed: 0,
       accepted: 0,
       samples: [],

@@ -140,8 +140,8 @@ Full design: [`docs/superpowers/specs/2026-05-09-webhook-delivery-hot-path-desig
 
 `apps/demo` serves a public page with a single button: **Run outage scenario**.
 
-- A run creates a fresh endpoint, then pushes 100 `order.created` events through the real API over 90 s.
-- The endpoint is a fake customer server on an internal port. It verifies every HMAC signature, then follows the same 4 phases as the chaos demo (200 → 500 → 50/50 → 200). 4 events carry a payload it rejects with `422`, to show the dead-letter path.
+- A run creates a fresh endpoint, then pushes 1,000 `order.created` events through the real API over 90 s.
+- The endpoint is a fake customer server on an internal port. It verifies every HMAC signature, then plays 4 phases: healthy, a 30 s outage (500), a flaky phase where one request in three fails, and recovery. The flaky pattern is deterministic, so the breaker's probe always lands and every run shows the backlog draining. 1 event in 25 carries a payload it rejects with `422`, to show the dead-letter path.
 - The service samples Postgres and Redis every second and streams the state to every open page over Server-Sent Events, so all visitors watch the same run.
 - Abuse limits: one run at a time, one run per IP every 3 minutes, and visitors can't supply a URL. The API, worker, Postgres and Redis are never exposed.
 - The last finished run is kept in Redis, so the page is never empty after a restart.

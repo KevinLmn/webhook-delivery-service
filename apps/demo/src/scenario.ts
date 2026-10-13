@@ -1,10 +1,10 @@
 // ============================================================================
 //  scenario.ts — The outage scenario played by the fake endpoint.
-//  Pure functions only: given "ms since run start" (+ randomness), what does
-//  the endpoint answer? Shared with the browser through /api/state.
+//  Pure functions only: given "ms since run start" (+ a request counter), what
+//  does the endpoint answer? Shared with the browser through /api/state.
 // ============================================================================
 
-export const TOTAL_EVENTS = 100
+export const TOTAL_EVENTS = 1000
 export const PUSH_DURATION_MS = 90_000 // events are spread so traffic keeps flowing through the outage
 export const RUN_DURATION_MS = 140_000 // 110s of phases + 30s to drain retries
 export const POISON_EVERY = 25 // every 25th event carries a payload the endpoint rejects (422)
@@ -38,14 +38,14 @@ export const PHASES: Phase[] = [
   },
   {
     startMs: 40_000,
-    endMs: 80_000,
+    endMs: 70_000,
     kind: 'mixed',
-    label: 'Flaky · 50% 500',
+    label: 'Flaky · 1 in 3 fails',
     description:
-      'Half the requests fail. The breaker probes (half_open), closes again, and exponential backoff retries absorb the remaining failures.',
+      'One request in three fails. The breaker probes (half_open) and closes again; failures are scattered, so it stays closed while exponential backoff retries absorb them.',
   },
   {
-    startMs: 80_000,
+    startMs: 70_000,
     endMs: RUN_DURATION_MS,
     kind: 'ok',
     label: 'Recovered',
@@ -66,16 +66,23 @@ export function isPoison(eventIndex: number): boolean {
   return (eventIndex + 1) % POISON_EVERY === 0
 }
 
+export function phaseKindAt(elapsedMs: number): PhaseKind {
+  return PHASES[phaseIndexAt(elapsedMs)]?.kind ?? 'ok'
+}
+
 /**
  * Status code the fake endpoint returns.
  * An outage wins over everything (the server is down before it reads the body);
  * otherwise a poison payload is rejected with 422, a terminal 4xx.
+ * In the flaky phase, `flakySeq` (n-th request of that phase) fails every third
+ * request. Deterministic on purpose: the first request, the breaker's probe,
+ * succeeds, and failures never line up 5 in a row, so every run tells the same story.
  */
-export function respond(opts: { elapsedMs: number; poison: boolean; random: number }): number {
-  const phase = PHASES[phaseIndexAt(opts.elapsedMs)]
-  if (phase?.kind === 'fail') return 500
+export function respond(opts: { elapsedMs: number; poison: boolean; flakySeq: number }): number {
+  const kind = phaseKindAt(opts.elapsedMs)
+  if (kind === 'fail') return 500
   if (opts.poison) return 422
-  if (phase?.kind === 'mixed' && opts.random < 0.5) return 500
+  if (kind === 'mixed' && opts.flakySeq % 3 === 2) return 500
   return 200
 }
 

@@ -6,12 +6,14 @@
 // ============================================================================
 import { verifyWebhookSignature } from '@vitrine/core'
 import Fastify, { type FastifyInstance } from 'fastify'
-import { respond } from './scenario'
+import { phaseKindAt, respond } from './scenario'
 
 export interface HookTarget {
   startedAt: number
   secret: string
   stats: { received: number; verified: number; rejected: number }
+  /** Requests answered during the flaky phase, drives its failure pattern */
+  flakySeq: number
 }
 
 export async function startHookServer(opts: {
@@ -52,7 +54,9 @@ export async function startHookServer(opts: {
       // not JSON: treat as a regular payload
     }
 
-    const status = respond({ elapsedMs: Date.now() - run.startedAt, poison, random: Math.random() })
+    const elapsedMs = Date.now() - run.startedAt
+    const flakySeq = phaseKindAt(elapsedMs) === 'mixed' ? run.flakySeq++ : 0
+    const status = respond({ elapsedMs, poison, flakySeq })
     return reply.code(status).send(status === 200 ? { ok: true } : { error: `scenario_${status}` })
   })
 

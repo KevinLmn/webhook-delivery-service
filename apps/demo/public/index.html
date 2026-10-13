@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Webhook Chaos Demo</title>
-  <meta name="description" content="Live demo of a webhook delivery service: 100 events, an endpoint that crashes, flaps and recovers, retries and a circuit breaker playing out in real time.">
+  <meta name="description" content="Live demo of a webhook delivery service: 1,000 events, an endpoint that crashes, flaps and recovers, retries and a circuit breaker playing out in real time.">
   <meta name="color-scheme" content="dark light">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
@@ -29,7 +29,7 @@
       <p class="eyebrow"><span class="live-dot" aria-hidden="true"></span> Live chaos demo</p>
       <h1>Watch a webhook pipeline survive an outage.</h1>
       <p class="lede">
-        Press the button and 100 events go through the real API, queue and worker toward an endpoint
+        Press the button and 1,000 events go through the real API, queue and worker toward an endpoint
         that is about to crash, flap, then recover. Retries, the circuit breaker and dead letters play
         out live. Nothing is simulated in your browser: every number below is read from Postgres and Redis.
       </p>
@@ -61,7 +61,7 @@
     <section class="kpis" aria-label="Live counters">
       <article class="kpi kpi-delivered">
         <h3>Delivered</h3>
-        <p class="kpi-value"><span id="kpi-delivered">0</span><small>/ <span id="kpi-total">100</span></small></p>
+        <p class="kpi-value"><span id="kpi-delivered">0</span><small>/ <span id="kpi-total">1000</span></small></p>
         <div class="meter"><span id="meter-delivered"></span></div>
       </article>
       <article class="kpi kpi-pending">
@@ -182,7 +182,7 @@
         </article>
         <article class="how-card">
           <h3><span class="num">5</span> Dead letters</h3>
-          <p>A 4xx means the endpoint is alive but refuses this payload: retrying won't help. The event goes straight to <code>dead</code>, and can be replayed manually later. 4 of the 100 events here are built to be rejected.</p>
+          <p>A 4xx means the endpoint is alive but refuses this payload: retrying won't help. The event goes straight to <code>dead</code>, and can be replayed manually later. 1 event in 25 here is built to be rejected.</p>
           <a data-src="packages/core/src/retry/classify.ts">classify.ts</a>
         </article>
       </div>
