@@ -6,7 +6,7 @@ Node/TypeScript service that ingests events through an HTTP API and delivers the
 
 > Showcase project. Not a production service used by real customers.
 
-**Live demo**: a public page where anyone can trigger an outage scenario and watch retries, the circuit breaker and dead letters play out in real time (see [Live demo page](#live-demo-page)).
+**Live demo**: **[webhook.kevinlemniai.fr](https://webhook.kevinlemniai.fr)**. Press the button to trigger an outage scenario and watch retries, the circuit breaker and dead letters play out in real time (see [Live demo page](#live-demo-page)).
 
 ## V1 features
 
@@ -150,16 +150,28 @@ The page is plain HTML/CSS/JS with no third-party code, served under a strict CS
 
 ## Deployment
 
-A single VPS running `docker-compose.prod.yml`: Postgres, Redis, API, worker and the demo service, behind Caddy (automatic HTTPS). Only Caddy publishes ports.
+A single VPS running `docker-compose.prod.yml`: Postgres, Redis, API, worker and the demo service. Nothing listens on a public interface except the reverse proxy; the demo page is bound to `127.0.0.1:3100`.
 
 ```bash
 # on the server, next to docker-compose.prod.yml
 cat > .env <<'ENV'
-DOMAIN=webhooks.example.com
 POSTGRES_PASSWORD=<random>
 MASTER_ENCRYPTION_KEY=<openssl rand -base64 32>
+# bundled Caddy with automatic HTTPS (skip these two if the host already runs a reverse proxy)
+COMPOSE_PROFILES=caddy
+DOMAIN=webhooks.example.com
 ENV
 docker compose -f docker-compose.prod.yml up -d --build
+```
+
+With an existing reverse proxy, point it at `127.0.0.1:3100` and disable response buffering so the live stream (SSE) is not held back. For a host Caddy:
+
+```
+webhooks.example.com {
+	reverse_proxy 127.0.0.1:3100 {
+		flush_interval -1
+	}
+}
 ```
 
 The `migrate` service applies the Drizzle schema before the API, worker and demo start. Keep a copy of `MASTER_ENCRYPTION_KEY`: losing it makes the stored endpoint secrets undecryptable.

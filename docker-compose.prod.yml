@@ -1,5 +1,7 @@
 # Production stack for a single VPS: `docker compose -f docker-compose.prod.yml up -d --build`
-# Required in .env (next to this file): DOMAIN, POSTGRES_PASSWORD, MASTER_ENCRYPTION_KEY.
+# Required in .env (next to this file): POSTGRES_PASSWORD, MASTER_ENCRYPTION_KEY.
+# Bundled HTTPS: also set DOMAIN and COMPOSE_PROFILES=caddy.
+# Host already runs a reverse proxy: leave the profile off and point it at 127.0.0.1:${DEMO_PORT:-3100}.
 x-app: &app
   build:
     context: .
@@ -81,10 +83,14 @@ services:
       HOOK_PORT: "3200"
       DEMO_API_URL: http://api:3000
       DEMO_HOOK_URL: http://demo:3200
+    # Loopback only: reachable by a reverse proxy on the host, never from the internet.
+    ports:
+      - "127.0.0.1:${DEMO_PORT:-3100}:3100"
     command: ["pnpm", "--filter", "@vitrine/demo", "start"]
 
   caddy:
     image: caddy:2-alpine
+    profiles: [caddy]
     restart: unless-stopped
     depends_on: [demo]
     ports:
@@ -92,7 +98,7 @@ services:
       - "443:443"
       - "443:443/udp"
     environment:
-      DOMAIN: ${DOMAIN:?set DOMAIN}
+      DOMAIN: ${DOMAIN:-localhost}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
