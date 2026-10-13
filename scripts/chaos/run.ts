@@ -6,7 +6,7 @@ import { sampleOnce, type Sample } from './collector.ts'
 import { renderChaosPng } from './render-png.ts'
 
 const TOTAL_EVENTS = 100
-const PUSH_DURATION_MS = 5_000
+const PUSH_DURATION_MS = 90_000  // spread across all phases so traffic hits the outage
 const RUN_DURATION_MS = 140_000  // 110 s phases + 30 s drain
 const SAMPLE_INTERVAL_MS = 1_000
 
@@ -71,6 +71,9 @@ async function main() {
   const stack = await bootChaosStack({ endpointUrl: fake.url })
   log(`stack ready, api at ${stack.apiBaseUrl}, endpoint=${stack.endpointId}`)
 
+  // Phases are relative to the run start, not to the fake endpoint boot
+  // (the docker stack takes ~15s to come up in between).
+  fake.startClock()
   const runStartedAt = Date.now()
   const samples: Sample[] = []
 

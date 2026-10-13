@@ -12,7 +12,8 @@ export interface PhaseConfig {
 
 export interface FakeEndpoint {
   url: string
-  startedAt: number
+  /** (Re)starts the phase clock: call it when the run actually starts, not at boot */
+  startClock: () => void
   /** Cumulative number of requests received */
   totalReceived: () => number
   /** Active phase at a given instant (to annotate the PNG) */
@@ -40,7 +41,7 @@ export async function startChaosFakeEndpoint(opts: {
   port?: number
 }): Promise<FakeEndpoint> {
   const phases = opts.phases ?? CHAOS_PHASES
-  const startedAt = Date.now()
+  let startedAt = Date.now()
   let totalReceived = 0
 
   const app: FastifyInstance = Fastify({ logger: false })
@@ -73,7 +74,9 @@ export async function startChaosFakeEndpoint(opts: {
 
   return {
     url,
-    startedAt,
+    startClock: () => {
+      startedAt = Date.now()
+    },
     totalReceived: () => totalReceived,
     phaseAt: (ms) => {
       let idx = 0

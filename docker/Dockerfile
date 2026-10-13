@@ -13,8 +13,9 @@ COPY packages/core/package.json packages/core/
 COPY packages/db/package.json packages/db/
 COPY packages/queue/package.json packages/queue/
 COPY packages/test-helpers/package.json packages/test-helpers/
+# --ignore-scripts: skip native builds (canvas, only used by the host-side chaos PNG renderer).
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --prod=false
+    pnpm install --frozen-lockfile --prod=false --ignore-scripts
 
 FROM base AS runtime
 ENV NODE_ENV=production
