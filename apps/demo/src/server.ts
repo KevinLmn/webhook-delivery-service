@@ -103,7 +103,7 @@ app.addHook('onSend', async (_request, reply) => {
   reply.header('x-frame-options', 'DENY')
   reply.header(
     'content-security-policy',
-    "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+    "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self' https://kevinlemniai.fr; connect-src 'self' https://kevinlemniai.fr; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
   )
 })
 
