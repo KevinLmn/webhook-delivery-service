@@ -55,6 +55,8 @@ export async function startChaosFakeEndpoint(opts: {
       return reply.code(behavior.statusCode).send({ error: 'fail' })
     }
     if (behavior.kind === 'mixed') {
+      // Random, so this CLI run varies from one run to the next. The public demo
+      // (apps/demo/src/scenario.ts) uses a deterministic pattern instead.
       const fail = Math.random() < behavior.failRatio
       if (fail) return reply.code(behavior.failStatusCode).send({ error: 'fail' })
       return reply.code(200).send({ ok: true })

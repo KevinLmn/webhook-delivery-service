@@ -60,6 +60,8 @@ export const events = pgTable(
     id: text('id').primaryKey(), // ex: "evt_01H..."
     endpointId: text('endpoint_id') // which endpoint to deliver to
       .notNull()
+      // No cascade here (unlike the other FKs): endpoints are archived, not
+      // deleted, and a hard delete must not silently wipe the delivery history.
       .references(() => endpoints.id),
     eventType: text('event_type').notNull(), // ex: "user.created"
     payload: jsonb('payload').notNull(), // the content, as JSONB (indexable JSON)
@@ -95,6 +97,8 @@ export const deliveryAttempts = pgTable(
   (t) => ({
     // UNIQUE INDEX: forbids two identical (event, attempt number) rows
     // → guarantees an attempt is never duplicated.
+    // Its leading column also serves "attempts of event X" lookups (detail page,
+    // MAX(attempt_number) in the worker), so no separate index on event_id.
     uniq: uniqueIndex('delivery_attempts_event_attempt_uniq').on(t.eventId, t.attemptNumber),
   }),
 )

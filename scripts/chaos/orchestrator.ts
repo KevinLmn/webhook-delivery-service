@@ -56,10 +56,15 @@ async function waitForApi(baseUrl: string, timeoutMs: number): Promise<void> {
 export async function bootChaosStack(opts: {
   endpointUrl: string
 }): Promise<ChaosStack> {
+  // Fresh key per run, used twice: passed to the containers through the compose
+  // env AND used below to encrypt the seeded endpoint secret. Both must match,
+  // or the worker can't decrypt the secret it has to sign with.
   const masterKey = randomBytes(32)
   const masterKeyB64 = masterKey.toString('base64')
 
   // 1) build + up the stack (migrate runs as init via depends_on)
+  //    `down -v` first: no leftover breaker state, jobs or rows from a previous
+  //    run, so every run starts from the same empty system.
   run('docker', ['compose', '-f', COMPOSE_FILE, 'down', '-v'])
   run('docker', ['compose', '-f', COMPOSE_FILE, 'up', '-d', '--build'], {
     MASTER_ENCRYPTION_KEY: masterKeyB64,
@@ -73,6 +78,8 @@ export async function bootChaosStack(opts: {
   await waitForApi(apiBaseUrl, 60_000)
 
   // 3) seed client + endpoint via the test-helpers package helpers
+  //    (straight into the DB: the API only accepts https endpoint URLs, and the
+  //    fake endpoint is plain http on the host)
   const db = createDbClient(databaseUrl)
   const redis = new IORedis(redisUrl, { maxRetriesPerRequest: null })
 

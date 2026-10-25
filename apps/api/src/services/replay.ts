@@ -23,6 +23,9 @@ export async function replayEvent(opts: {
     .limit(1)
 
   if (!row) return { kind: 'not_found' }
+  // Refuse while pending: two live jobs for one event would race on attemptNumber
+  // and could deliver twice. (Check-then-update, not atomic: two replays sent at
+  // the same instant could both pass.)
   if (row.event.status === 'pending') return { kind: 'conflict_pending' }
 
   await opts.db
@@ -33,6 +36,9 @@ export async function replayEvent(opts: {
   await opts.queue.add(
     'deliver',
     { eventId: opts.eventId },
+    // NOT jobId = eventId: the original job may still be kept in Redis
+    // (removeOnComplete/removeOnFail), and add() with an existing jobId is
+    // silently ignored, so the replay would never run.
     { jobId: `${opts.eventId}-replay-${Date.now()}` },
   )
 

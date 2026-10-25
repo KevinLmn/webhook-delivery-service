@@ -28,6 +28,9 @@ else
 end
 
 local event = ARGV[1]
+-- The clock comes from the caller, not from Redis TIME: tests can inject any
+-- instant, at the price of trusting worker clocks to agree (NTP) within the
+-- precision we care about (seconds, against a 30 s cooldown).
 local now = tonumber(ARGV[2])
 local initial = tonumber(ARGV[3])
 local cap = tonumber(ARGV[4])
@@ -37,6 +40,8 @@ local ttl = tonumber(ARGV[6])
 -- 2) Lazy open -> half_open transition: if the cooldown has elapsed, switch
 --    to "probe" BEFORE applying the event. (Nobody "wakes up" the breaker:
 --    the next read is what notices that the time has passed.)
+--    Unlike fsm.ts, this runs for EVERY event, not only 'read': a 'failure'
+--    that lands after the cooldown is treated as a failed probe (reopen, doubled).
 if state.state == 'open' and state.openedAt and (state.openedAt + state.openDurationMs) <= now then
   state.state = 'half_open'
   state.openedAt = cjson.null
@@ -51,11 +56,13 @@ if state.state == 'closed' then
     if state.failCount >= threshold then
       state.state = 'open'              -- 5th failure → OPEN
       state.openedAt = now
-      state.failCount = 0
+      state.failCount = 0                -- unused while open; the next close counts from 0 again
       state.openDurationMs = initial
     end
   end
 elseif state.state == 'open' then
+  -- A 'failure' here is deliberately a no-op: it comes from a request that was
+  -- already in flight when the breaker opened, and must not extend the cooldown.
   if event == 'success' then
     -- Defensive: a success while "open" shouldn't happen, but close cleanly anyway.
     state.state = 'closed'
@@ -78,6 +85,9 @@ elseif state.state == 'half_open' then
 end
 
 -- 4) Write the state back (with 24h TTL) and return it to the Node code.
+--    Even a 'read' writes: the lazy open -> half_open flip must be persisted so
+--    every worker sees the same state, and the TTL slides so only endpoints
+--    that went quiet for 24h lose their history.
 local encoded = cjson.encode(state)
 redis.call('SET', KEYS[1], encoded, 'EX', ttl)
 return encoded

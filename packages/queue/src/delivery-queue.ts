@@ -19,7 +19,12 @@ export function createDeliveryQueue(connection: ConnectionOptions): Queue<Delive
     connection,
     defaultJobOptions: {
       attempts: MAX_ATTEMPTS, // 7 attempts max (see the backoff schedule)
+      // 'custom' rather than BullMQ's built-in 'exponential': our schedule is
+      // hand-tuned (not powers of two), jittered, and swappable in tests.
       backoff: { type: 'custom' }, // use OUR delay strategy (below)
+      // Bounded history: jobs live in Redis memory, and prod Redis runs with
+      // maxmemory + noeviction, so an unbounded queue would end up refusing writes
+      // (= ingestion failing). Postgres is the long-term record, not BullMQ.
       removeOnComplete: { count: 1000 }, // keep the last 1000 completed jobs (the rest is purged)
       removeOnFail: { count: 5000 }, // keep the last 5000 failed jobs
     },
@@ -30,6 +35,8 @@ export function createDeliveryQueue(connection: ConnectionOptions): Queue<Delive
 export function workerSettings(): WorkerOptions['settings'] {
   return {
     // BullMQ calls this to know how long to wait before the next attempt.
+    // Only for jobs that THREW a plain Error: DelayedError paths (breaker open,
+    // Retry-After) pick their own delay and never reach this function.
     backoffStrategy: (attemptsMade: number) => {
       // attemptsMade = number of attempts ALREADY made.
       // Our schedule: attempt 1 = immediate, retries = attempts 2..7.

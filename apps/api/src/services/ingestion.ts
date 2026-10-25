@@ -32,14 +32,21 @@ export async function ingestEvent(opts: {
   if (!ep) return { kind: 'endpoint_not_found' }
 
   // 2) Prepare the idempotency entry: payload hash + a new eventId.
+  // Hash of the RE-serialized payload: it follows the client's key order, so the
+  // same object sent with keys reordered counts as a different payload (→ 422).
   const payloadStr = JSON.stringify(opts.payload)
   const incomingHash = sha256Hex(payloadStr)
+  // The id is minted BEFORE the claim so the single atomic SET NX stores which
+  // event this key maps to: no second round trip, no window without a value.
   const eventId = newId('evt')
   const idemKey = `idem:${opts.clientId}:${opts.idempotencyKey}` // key scoped per client
   const idemValue = JSON.stringify({ eventId, payloadSha256: incomingHash })
 
   // 3) ⭐ SET ... NX = "write ONLY if the key does not exist" → ATOMIC.
   //    This is the building block that keeps ingestion safe even under concurrent requests.
+  //    Known gap: the key is claimed BEFORE the Postgres insert. If the insert
+  //    or the enqueue below fails, the key still points to this eventId for 24h,
+  //    and a client retry gets 200 for an event that was never stored.
   const setOk = await opts.redis.set(idemKey, idemValue, 'EX', IDEM_TTL_SEC, 'NX')
   if (setOk === null) {
     // The key already existed → this is a replay. Decide: existing or conflict.
@@ -52,6 +59,10 @@ export async function ingestEvent(opts: {
   }
 
   // 4) Fresh key → insert the event into the DB (status "pending").
+  //    No transaction around insert + enqueue: it would span two systems
+  //    (Postgres and Redis), which a DB transaction can't do. A crash between
+  //    the two leaves a "pending" row with no job; a transactional outbox (or a
+  //    sweeper re-enqueuing old pending rows) would close that gap.
   await opts.db.insert(events).values({
     id: eventId,
     endpointId: opts.endpointId,

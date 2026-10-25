@@ -22,6 +22,8 @@ const SUPPORTED_SCHEME = 'v1' // signature format versioning
 // Including timestamp + id protects against REPLAY attacks.
 function compute(params: SignParams): string {
   const signedString = `${params.id}.${params.timestamp}.${params.body}`
+  // Key = the secret as raw UTF-8. Svix base64-decodes it after stripping
+  // "whsec_", so Svix verifiers need to adapt their key (see README interop note).
   const mac = createHmac('sha256', params.secret).update(signedString, 'utf8').digest('base64')
   return mac
 }
@@ -45,6 +47,10 @@ export function verifyWebhookSignature(params: VerifyParams): boolean {
   } catch {
     return false
   }
+  // timingSafeEqual throws on different lengths. Returning early leaks only the
+  // length, which is public anyway (SHA-256 MAC = 32 bytes).
+  // Note: no timestamp-freshness check here; replay protection is the receiver's
+  // job (compare webhook-timestamp to its own clock).
   if (providedBuf.length !== expectedBuf.length) return false
   // ⭐ timingSafeEqual = CONSTANT-TIME comparison.
   // NEVER compare signatures with ===: it would leak info through

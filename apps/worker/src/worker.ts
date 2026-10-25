@@ -51,6 +51,8 @@ export async function startWorker(opts: StartWorkerOptions): Promise<Worker<Deli
 
       // retry with override (429 Retry-After) → same DelayedError trick (imposed
       // delay, without burning an attempt).
+      // Consequence: an endpoint that ALWAYS answers 429 + Retry-After never
+      // exhausts the 7 attempts; only the breaker slows it down.
       if (result.delayOverrideMs !== undefined) {
         await job.moveToDelayed(Date.now() + result.delayOverrideMs, token)
         throw new DelayedError(`retry:${result.reason}:override_${result.delayOverrideMs}ms`)
@@ -62,6 +64,9 @@ export async function startWorker(opts: StartWorkerOptions): Promise<Worker<Deli
     },
     {
       connection: redis,
+      // I/O-bound work on one event loop: 10 requests in flight overlap their
+      // network waits. Same number as the Postgres pool (max: 10 in db/client.ts),
+      // and a job runs one query at a time, so jobs never wait for a connection.
       concurrency: 10, // up to 10 deliveries in parallel
       settings: workerSettings() as NonNullable<WorkerOptions['settings']>,
     },
@@ -69,6 +74,8 @@ export async function startWorker(opts: StartWorkerOptions): Promise<Worker<Deli
 
   // Safety net: when BullMQ has exhausted ALL attempts (5xx/network errors
   // that never produced a 4xx), mark the event "dead" here.
+  // 'failed' fires after EVERY failed attempt (retries included), hence the
+  // attemptsMade check below instead of trusting the event alone.
   worker.on('failed', (job, err) => {
     logger.warn({ jobId: job?.id, err: err.message }, 'job failed')
     if (!job) return
@@ -92,6 +99,10 @@ export async function startWorker(opts: StartWorkerOptions): Promise<Worker<Deli
 }
 
 // Direct launch (worker process): reads the master key from the env.
+// No SIGTERM handler: `docker stop` kills the process with jobs in flight. Their
+// lock expires, BullMQ's stalled-job check re-queues them, and the endpoint may
+// receive those events twice. Calling `worker.close()` on SIGTERM (which waits
+// for running jobs) would make deploys clean.
 if (import.meta.url === `file://${process.argv[1]}`) {
   const masterKeyEnv = process.env.MASTER_ENCRYPTION_KEY
   if (!masterKeyEnv) throw new Error('MASTER_ENCRYPTION_KEY is required')

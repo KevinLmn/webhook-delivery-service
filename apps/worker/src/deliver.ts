@@ -12,7 +12,10 @@ import type { Redis } from 'ioredis'
 import type { Logger } from 'pino'
 import { deliverOnce } from './http-client'
 
+// Bounds how long one slow endpoint can hold one of the worker's 10 slots.
 const TIMEOUT_MS = 10_000
+// Beyond this, parseRetryAfter returns null: the header is IGNORED (normal
+// backoff applies), not clamped. A buggy/hostile value can't park a job for days.
 const MAX_RETRY_AFTER_MS = 6 * 3600 * 1000 // cap any Retry-After at 6h
 
 export interface DeliverContext {
@@ -56,6 +59,8 @@ export async function deliver(
     // skip counter (observability, 1h TTL)
     await ctx.redis.incr(`breaker:skip_count:${evRow.endpoint.id}`)
     await ctx.redis.expire(`breaker:skip_count:${evRow.endpoint.id}`, 3600)
+    // 1s floor: with worker clocks slightly apart, `remaining` can be ~0 or
+    // negative; without the floor, the job would spin on the open breaker.
     return { kind: 'breaker_skip', remainingMs: Math.max(remaining, 1000) }
   }
 
@@ -63,6 +68,8 @@ export async function deliver(
   //     (Avoids a thundering herd on reopening.)
   if (breaker.state === 'half_open') {
     const lockKey = `breaker:${evRow.endpoint.id}:probe_lock`
+    // Never released explicitly: it just expires. Known gap: 5s is shorter than
+    // the 10s HTTP timeout, so a slow probe can let a second probe through.
     const acquired = await ctx.redis.set(lockKey, '1', 'EX', 5, 'NX') // SET NX = atomic lock
     if (!acquired) {
       return { kind: 'breaker_skip', remainingMs: 1000 } // another one is already probing → come back later
@@ -71,7 +78,11 @@ export async function deliver(
 
   // 3) Decrypt the secret, sign, POST (one attempt).
   const secret = decryptSecret(evRow.endpoint.secretEncrypted, ctx.masterKey)
+  // Timestamp of THIS attempt, not of ingestion: receivers reject signatures
+  // outside a tolerance window (minutes), and a retry can come 6h later.
   const timestamp = Math.floor(Date.now() / 1000)
+  // The body is re-serialized from JSONB (Postgres normalizes key order), so it
+  // may differ from the bytes the client sent. Fine: we sign exactly what we send.
   const body = JSON.stringify(evRow.event.payload)
 
   const result = await deliverOnce({
@@ -84,6 +95,9 @@ export async function deliver(
   })
 
   // 4) Record this attempt. attemptNumber = max(existing) + 1.
+  //    Read-then-insert is not atomic, but only one job per event runs at a
+  //    time (jobId = eventId + BullMQ's job lock); the unique index on
+  //    (event_id, attempt_number) is the backstop if that ever breaks.
   const [maxRow] = await ctx.db
     .select({ max: sql<number>`COALESCE(MAX(${deliveryAttempts.attemptNumber}), 0)` })
     .from(deliveryAttempts)
@@ -103,6 +117,10 @@ export async function deliver(
   // 5) Depending on the result: update breaker + update event + decision.
 
   // 5a) SUCCESS (2xx/3xx) → breaker success, event "delivered".
+  //     Not one transaction with the attempt insert above (and the HTTP call
+  //     can't be in one anyway): if the process dies here, the job stalls and
+  //     BullMQ runs it again → the endpoint gets the event twice. That is the
+  //     at-least-once contract; receivers dedupe on the webhook-id header.
   if (result.outcome.kind === 'success') {
     await recordOutcome(ctx.redis, evRow.endpoint.id, 'success', Date.now())
     await ctx.db
@@ -124,6 +142,8 @@ export async function deliver(
   }
 
   // 5c) Everything else (5xx, timeout, network, throttle) → breaker "failure" + retry.
+  //     A 429 counts as a failure too: an endpoint asking us to back off should
+  //     trip the breaker just like one that is down.
   await recordOutcome(ctx.redis, evRow.endpoint.id, 'failure', Date.now())
 
   // 429: honor Retry-After if present and valid.

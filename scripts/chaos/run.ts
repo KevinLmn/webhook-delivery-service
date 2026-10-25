@@ -34,6 +34,8 @@ async function pushEvents(opts: {
   const tasks: Promise<void>[] = []
   for (let i = 0; i < opts.total; i++) {
     const t = Date.now()
+    // Fire and forget (awaited all at the end): a slow API response must not
+    // delay the next push, or the outage phase would get fewer events.
     const task = (async () => {
       const r = await request(`${opts.apiBaseUrl}/events`, {
         method: 'POST',
@@ -90,6 +92,8 @@ async function main() {
   })
 
   // sample for the whole duration
+  // Absolute schedule (nextTick += 1s) instead of sleep(1s) after each sample:
+  // sampling takes time, and a relative sleep would drift over ~140 samples.
   let nextTick = Date.now()
   while (Date.now() - runStartedAt < RUN_DURATION_MS) {
     nextTick += SAMPLE_INTERVAL_MS

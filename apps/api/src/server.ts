@@ -60,6 +60,9 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
 
 // If this file is run DIRECTLY (not imported), start the server.
 // (The `import.meta.url === file://argv[1]` pattern = "am I the entry point?")
+// No SIGTERM handler: the onClose hooks (queue + Redis cleanup) only run when
+// app.close() is called, which nothing does on `docker stop`. Ingestion is
+// short, so the risk is a request cut between the Redis claim and the insert.
 if (import.meta.url === `file://${process.argv[1]}`) {
   const app = await buildApp()
   await app.listen({ host: '0.0.0.0', port: Number(process.env.PORT ?? 3000) })

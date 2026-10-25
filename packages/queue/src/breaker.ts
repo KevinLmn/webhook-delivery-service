@@ -39,6 +39,8 @@ export function setBreakerConfigOverride(override: BreakerConfigOverride | null)
 export type BreakerEvent = 'success' | 'failure' | 'read'
 
 // Cache the loaded script's SHA so we don't resend the script on every call.
+// Safe to share process-wide: the SHA1 depends only on the script text, so it is
+// the same for every Redis client. Only Redis' own script cache can be lost.
 let scriptSha: string | null = null
 
 // Loads the script into Redis (SCRIPT LOAD) → returns its SHA1. Only once.
@@ -69,6 +71,8 @@ export async function recordOutcome(
   try {
     // EVALSHA = "run the already-loaded script by its SHA" (lighter than EVAL).
     // The "1" = number of KEYS; here KEYS[1] = `breaker:${endpointId}`.
+    // The key goes through KEYS (not built inside Lua) so Redis Cluster could
+    // route the script to the node that owns it.
     raw = (await redis.evalsha(sha, 1, `breaker:${endpointId}`, ...args)) as string
   } catch (err) {
     // If Redis forgot the script (restart, flush) → NOSCRIPT error.
